@@ -13,6 +13,11 @@ The official world is the **random 5 x 5 km world, seed 1234**.
 - Changing `ThorvayneWorldGen.cs` changes what seed 1234 produces. Keep seed 1234's output the same, or work in
   the saved scene instead.
 
+## Opening in Unity
+The repository root is a Unity project for **Unity 6000.6.6f1** (Unity Hub: Add > Add project from disk,
+pick this folder). On first open Unity creates the rest of the project files. To use URP like the rest of the
+project, install **Universal RP** from Window > Package Manager > Unity Registry (the tools work with or without it).
+
 ## Folders
 - `Assets/Thorvayne/` — drop into a Unity project's `Assets` folder (Unity 6 or 2022.3).
   - `Editor/RandomWorld/` — the 5 x 5 km generator, its window, and the Test Player setup.
