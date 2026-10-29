@@ -23,7 +23,7 @@ public static class ThorvayneWorldBuilder
     const float TreeDensity = 0.9f;      // 0..1 multiplier on the forest map
     const float LayerTileSize = 10f;     // metres per texture repeat
     const int Seed = 12345;
-    const bool TransparentWater = false; // solid water always renders; true = see-through (may need the material toggle fix in URP)
+    static readonly bool TransparentWater = false; // solid water always renders; true = see-through (may need the material toggle fix in URP)
 
     [Serializable] class Marker { public string name; public string type; public float u; public float v; public int dangerTier; public bool isStarter; }
     [Serializable] class World
@@ -190,6 +190,11 @@ public static class ThorvayneWorldBuilder
         go.AddComponent<MeshRenderer>().sharedMaterials = new[] { trunk, leaves };
         var col = go.AddComponent<CapsuleCollider>();
         col.radius = 0.4f; col.height = 4f; col.center = new Vector3(0, 2f, 0);
+        // A single-level LODGroup tells the terrain to draw this as a plain mesh tree, so it doesn't
+        // demand the Nature/Soft Occlusion shader (and warn about billboards) for these placeholder trees.
+        var lod = go.AddComponent<LODGroup>();
+        lod.SetLODs(new[] { new LOD(0.01f, new Renderer[] { go.GetComponent<MeshRenderer>() }) });
+        lod.RecalculateBounds();
         string path = $"{GenDir}/Tree_{name}.prefab";
         var prefab = PrefabUtility.SaveAsPrefabAsset(go, path);
         UnityEngine.Object.DestroyImmediate(go);

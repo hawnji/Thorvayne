@@ -522,6 +522,11 @@ namespace Thorvayne.WorldGen.EditorTools
             go.AddComponent<MeshRenderer>().sharedMaterials = new[] { trunk, leaves };
             var col = go.AddComponent<CapsuleCollider>();
             col.radius = 0.4f; col.height = 4f; col.center = new Vector3(0, 2f, 0);
+            // A single-level LODGroup tells the terrain to draw this as a plain mesh tree, so it doesn't
+            // demand the Nature/Soft Occlusion shader (and warn about billboards) for these placeholder trees.
+            var lod = go.AddComponent<LODGroup>();
+            lod.SetLODs(new[] { new LOD(0.01f, new Renderer[] { go.GetComponent<MeshRenderer>() }) });
+            lod.RecalculateBounds();
             string path = $"{GenDir}/Tree_{name}.prefab";
             var prefab = PrefabUtility.SaveAsPrefabAsset(go, path);
             UnityEngine.Object.DestroyImmediate(go);
