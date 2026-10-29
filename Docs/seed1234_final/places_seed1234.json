@@ -1,0 +1,427 @@
+{
+ "seed": 1234,
+ "worldSize": 5000,
+ "seaLevel": 40,
+ "heightScale": 600,
+ "settlements": [
+  {
+   "name": "Northhaven",
+   "type": "city",
+   "x": 3992.188,
+   "z": 3226.563,
+   "y": 43.1917,
+   "tier": 4,
+   "starter": false,
+   "biome": "Swamp"
+  },
+  {
+   "name": "Goldstrand",
+   "type": "city",
+   "x": 1617.188,
+   "z": 4085.938,
+   "y": 43.62185,
+   "tier": 3,
+   "starter": false,
+   "biome": "PineForest"
+  },
+  {
+   "name": "Ashwash",
+   "type": "city",
+   "x": 2695.313,
+   "z": 445.3125,
+   "y": 43.09888,
+   "tier": 4,
+   "starter": false,
+   "biome": "Forest"
+  },
+  {
+   "name": "Greycove",
+   "type": "town",
+   "x": 1117.188,
+   "z": 804.6875,
+   "y": 43.05992,
+   "tier": 4,
+   "starter": false,
+   "biome": "Savanna"
+  },
+  {
+   "name": "Bramhurst",
+   "type": "town",
+   "x": 820.3125,
+   "z": 3132.813,
+   "y": 43.61601,
+   "tier": 3,
+   "starter": false,
+   "biome": "Forest"
+  },
+  {
+   "name": "Elmmere",
+   "type": "town",
+   "x": 3945.313,
+   "z": 2070.313,
+   "y": 60.84193,
+   "tier": 3,
+   "starter": false,
+   "biome": "Forest"
+  },
+  {
+   "name": "Frostwash",
+   "type": "town",
+   "x": 2492.188,
+   "z": 2773.438,
+   "y": 84.08959,
+   "tier": 1,
+   "starter": true,
+   "biome": "Forest"
+  },
+  {
+   "name": "Ravenhurst",
+   "type": "town",
+   "x": 1304.688,
+   "z": 1710.938,
+   "y": 53.44317,
+   "tier": 3,
+   "starter": false,
+   "biome": "Forest"
+  },
+  {
+   "name": "Glenfield",
+   "type": "town",
+   "x": 320.3125,
+   "z": 3976.563,
+   "y": 66.09341,
+   "tier": 4,
+   "starter": false,
+   "biome": "PineForest"
+  },
+  {
+   "name": "Bramcrest",
+   "type": "village",
+   "x": 695.3125,
+   "z": 2414.063,
+   "y": 65.24459,
+   "tier": 3,
+   "starter": false,
+   "biome": "Forest"
+  },
+  {
+   "name": "Barrowley",
+   "type": "village",
+   "x": 2039.063,
+   "z": 1460.938,
+   "y": 64.70765,
+   "tier": 3,
+   "starter": false,
+   "biome": "Forest"
+  },
+  {
+   "name": "Sunmere",
+   "type": "village",
+   "x": 3085.938,
+   "z": 1914.063,
+   "y": 89.81339,
+   "tier": 2,
+   "starter": false,
+   "biome": "Forest"
+  },
+  {
+   "name": "Wrenhaven",
+   "type": "village",
+   "x": 4492.188,
+   "z": 2335.938,
+   "y": 42.87907,
+   "tier": 3,
+   "starter": false,
+   "biome": "Forest"
+  },
+  {
+   "name": "Rushbank",
+   "type": "village",
+   "x": 1757.813,
+   "z": 2492.188,
+   "y": 60.1121,
+   "tier": 3,
+   "starter": false,
+   "biome": "Swamp"
+  },
+  {
+   "name": "Northport",
+   "type": "village",
+   "x": 257.8125,
+   "z": 2195.313,
+   "y": 66.0847,
+   "tier": 4,
+   "starter": false,
+   "biome": "Forest"
+  },
+  {
+   "name": "Greymouth",
+   "type": "village",
+   "x": 4507.813,
+   "z": 1757.813,
+   "y": 42.94471,
+   "tier": 4,
+   "starter": false,
+   "biome": "Forest"
+  },
+  {
+   "name": "Cindermouth",
+   "type": "village",
+   "x": 3664.063,
+   "z": 914.0625,
+   "y": 65.61649,
+   "tier": 4,
+   "starter": false,
+   "biome": "Forest"
+  },
+  {
+   "name": "Ravendale",
+   "type": "village",
+   "x": 1664.063,
+   "z": 648.4375,
+   "y": 43.43958,
+   "tier": 4,
+   "starter": false,
+   "biome": "Savanna"
+  },
+  {
+   "name": "Blackhaven",
+   "type": "village",
+   "x": 929.6875,
+   "z": 1335.938,
+   "y": 43.91745,
+   "tier": 4,
+   "starter": false,
+   "biome": "Forest"
+  }
+ ],
+ "caves": [
+  {
+   "name": "Marshshade Cavern",
+   "x": 2308.93,
+   "z": 3097.992,
+   "y": 84.05025,
+   "yaw": -135,
+   "tier": 2,
+   "biome": "PineForest"
+  },
+  {
+   "name": "Blackcrag Burrow",
+   "x": 2868.637,
+   "z": 3142.074,
+   "y": 76.03502,
+   "yaw": 45,
+   "tier": 2,
+   "biome": "Forest"
+  },
+  {
+   "name": "Yewmaw Cavern",
+   "x": 2035.493,
+   "z": 1972.993,
+   "y": 77.2512,
+   "yaw": -135,
+   "tier": 3,
+   "biome": "Forest"
+  },
+  {
+   "name": "Embermaw Cavern",
+   "x": 3012.797,
+   "z": 1057.516,
+   "y": 172.2332,
+   "yaw": 135,
+   "tier": 4,
+   "biome": "Savanna"
+  },
+  {
+   "name": "Sungloom Cavern",
+   "x": 2607.219,
+   "z": 1349.407,
+   "y": 73.48387,
+   "yaw": -135,
+   "tier": 5,
+   "biome": "Desert"
+  },
+  {
+   "name": "Mossrock Cave",
+   "x": 1192.484,
+   "z": 3862.203,
+   "y": 60.83242,
+   "yaw": 135,
+   "tier": 4,
+   "biome": "PineForest"
+  },
+  {
+   "name": "Wildgloom Mine",
+   "x": 3502.156,
+   "z": 1224.407,
+   "y": 171.8326,
+   "yaw": 135,
+   "tier": 4,
+   "biome": "Savanna"
+  },
+  {
+   "name": "Coppercrag Grotto",
+   "x": 4021.281,
+   "z": 1533.405,
+   "y": 264.589,
+   "yaw": -45,
+   "tier": 4,
+   "biome": "Grassland"
+  },
+  {
+   "name": "Wester Cave",
+   "x": 2326.004,
+   "z": 1830.246,
+   "y": 83.00031,
+   "yaw": 135,
+   "tier": 3,
+   "biome": "Forest"
+  },
+  {
+   "name": "Hazelrock Cave",
+   "x": 2590.215,
+   "z": 3355.84,
+   "y": 70.94125,
+   "yaw": 45,
+   "tier": 2,
+   "biome": "PineForest"
+  },
+  {
+   "name": "Froststone Burrow",
+   "x": 2501.449,
+   "z": 3943.863,
+   "y": 105.127,
+   "yaw": 135,
+   "tier": 4,
+   "biome": "Snow"
+  },
+  {
+   "name": "Oakgloom Cave",
+   "x": 2199.59,
+   "z": 2246.465,
+   "y": 105.6328,
+   "yaw": 45,
+   "tier": 2,
+   "biome": "Forest"
+  },
+  {
+   "name": "Frostmaw Den",
+   "x": 2141.297,
+   "z": 3936.828,
+   "y": 106.2011,
+   "yaw": -45,
+   "tier": 4,
+   "biome": "Snow"
+  },
+  {
+   "name": "Briarstone Burrow",
+   "x": 2703.797,
+   "z": 992.8601,
+   "y": 62.25076,
+   "yaw": -135,
+   "tier": 4,
+   "biome": "Savanna"
+  },
+  {
+   "name": "Fair Cavern",
+   "x": 3042.633,
+   "z": 1394.195,
+   "y": 261.2011,
+   "yaw": 45,
+   "tier": 4,
+   "biome": "Grassland"
+  },
+  {
+   "name": "Glengloom Cave",
+   "x": 4399.18,
+   "z": 1483.634,
+   "y": 74.43604,
+   "yaw": 135,
+   "tier": 5,
+   "biome": "Savanna"
+  },
+  {
+   "name": "Longgloom Mine",
+   "x": 750.6726,
+   "z": 3891.297,
+   "y": 73.33936,
+   "yaw": -135,
+   "tier": 5,
+   "biome": "PineForest"
+  },
+  {
+   "name": "Coldgloom Grotto",
+   "x": 1872.845,
+   "z": 994.3433,
+   "y": 58.75,
+   "yaw": -45,
+   "tier": 4,
+   "biome": "Forest"
+  }
+ ],
+ "bridges": [
+  {
+   "x": 554.6875,
+   "z": 2308.594,
+   "y": 57.71513,
+   "len": 23.46928,
+   "yaw": -116.565
+  },
+  {
+   "x": 1203.125,
+   "z": 1601.563,
+   "y": 52.85773,
+   "len": 28.09709,
+   "yaw": -135
+  },
+  {
+   "x": 929.6875,
+   "z": 1273.438,
+   "y": 43.19766,
+   "len": 21.625,
+   "yaw": 180
+  },
+  {
+   "x": 1066.406,
+   "z": 882.8125,
+   "y": 43.05436,
+   "len": 23.46928,
+   "yaw": 153.435
+  },
+  {
+   "x": 4500,
+   "z": 2238.281,
+   "y": 42.4897,
+   "len": 29.4375,
+   "yaw": 180
+  },
+  {
+   "x": 1062.5,
+   "z": 2937.5,
+   "y": 58.04749,
+   "len": 28.09709,
+   "yaw": -45
+  },
+  {
+   "x": 1867.188,
+   "z": 1597.656,
+   "y": 65.52179,
+   "len": 23.46928,
+   "yaw": 116.565
+  },
+  {
+   "x": 2500,
+   "z": 2113.281,
+   "y": 72.04066,
+   "len": 23.46928,
+   "yaw": -63.43495
+  },
+  {
+   "x": 2523.438,
+   "z": 445.3125,
+   "y": 43.26067,
+   "len": 21.625,
+   "yaw": 90
+  }
+ ]
+}

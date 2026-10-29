@@ -1,0 +1,225 @@
+using System.Collections.Generic;
+using System.Linq;
+using UnityEditor;
+using UnityEditor.Animations;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.Rendering;
+
+namespace Thorvayne.WorldGen.EditorTools
+{
+    // Menu: Thorvayne > Add Test Player
+    // Puts a walkable third-person test character at the world's PlayerSpawn. Press Play to walk around.
+    // The random world generator calls this automatically after each build.
+    public static class ThorvayneTestPlayerSetup
+    {
+        const string PlayerName = "Test Player";
+        const string HeroPath = "Assets/Thorvayne/Characters/ThorvayneHero.fbx";
+        const string ControllerPath = "Assets/Thorvayne/Characters/ThorvayneHero.controller";
+        static readonly string[] Clips = { "Idle", "Walk", "Run", "Jump", "Swim", "Fly" };
+        const float HeroHeight = 1.8f;
+
+        [MenuItem("Thorvayne/Add Test Player")]
+        static void AddFromMenu()
+        {
+            var spawn = GameObject.Find("Thorvayne Random World/PlayerSpawn") ?? GameObject.Find("PlayerSpawn");
+            if (spawn == null)
+            {
+                EditorUtility.DisplayDialog("Thorvayne", "No PlayerSpawn found. Generate a world first (Thorvayne > Random World Generator).", "OK");
+                return;
+            }
+            var sea = GameObject.Find("Thorvayne Random World/Sea") ?? GameObject.Find("Sea");
+            var player = Setup(spawn.transform.position, sea != null ? sea.transform.position.y : -10000f);
+            Selection.activeGameObject = player;
+        }
+
+        public static GameObject Setup(Vector3 position, float seaLevel)
+        {
+            var old = GameObject.Find(PlayerName);
+            if (old != null) Undo.DestroyObjectImmediate(old);
+
+            var player = new GameObject(PlayerName);
+            player.transform.position = position + Vector3.up * 0.2f;
+            var cc = player.AddComponent<CharacterController>();
+            cc.height = 1.9f; cc.radius = 0.4f; cc.center = new Vector3(0, 0.95f, 0);
+            cc.slopeLimit = 50f; cc.stepOffset = 0.5f;
+
+            if (!AddHeroModel(player))
+            {
+                // placeholder body: a capsule with a "visor" box so you can see which way it faces
+                var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                body.name = "Body";
+                Object.DestroyImmediate(body.GetComponent<Collider>());
+                body.transform.SetParent(player.transform, false);
+                body.transform.localPosition = new Vector3(0, 0.95f, 0);
+                body.transform.localScale = new Vector3(0.8f, 0.95f, 0.8f);
+                body.GetComponent<MeshRenderer>().sharedMaterial = PlayerMat("PlayerBody", new Color(0.2f, 0.45f, 0.85f));
+                var visor = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                visor.name = "Visor";
+                Object.DestroyImmediate(visor.GetComponent<Collider>());
+                visor.transform.SetParent(player.transform, false);
+                visor.transform.localPosition = new Vector3(0, 1.55f, 0.33f);
+                visor.transform.localScale = new Vector3(0.5f, 0.15f, 0.2f);
+                visor.GetComponent<MeshRenderer>().sharedMaterial = PlayerMat("PlayerVisor", new Color(1f, 0.85f, 0.3f));
+            }
+
+            var p = player.AddComponent<ThorvaynePlayer>();
+            p.seaLevel = seaLevel;
+            p.cam = MainCamera();
+
+            Undo.RegisterCreatedObjectUndo(player, "Add Test Player");
+            EditorSceneManager.MarkSceneDirty(player.scene);
+            return player;
+        }
+
+        // ---------------- animated character ----------------
+        // Uses Characters/ThorvayneHero.fbx when it is in the project; otherwise the capsule placeholder is used.
+        static bool AddHeroModel(GameObject player)
+        {
+            var model = AssetDatabase.LoadAssetAtPath<GameObject>(HeroPath);
+            if (model == null) return false;
+            EnsureImportSettings();
+            var controller = BuildController();
+            if (controller == null) return false;
+
+            var body = (GameObject)PrefabUtility.InstantiatePrefab(model);
+            body.name = "Body";
+            body.transform.SetParent(player.transform, false);
+            body.transform.localPosition = Vector3.zero;
+            body.transform.localRotation = Quaternion.identity;
+
+            // face the player's forward (+Z): the toes point the way the model faces
+            var bodyAnim = body.GetComponent<Animator>();
+            bool human = bodyAnim != null && bodyAnim.isHuman;
+            var foot = human ? bodyAnim.GetBoneTransform(HumanBodyBones.LeftFoot) : FindDeep(body.transform, "LeftFoot");
+            var toes = human ? bodyAnim.GetBoneTransform(HumanBodyBones.LeftToes) : FindDeep(body.transform, "LeftToes");
+            if (foot != null && toes != null)
+            {
+                var d = toes.position - foot.position; d.y = 0;
+                if (d.sqrMagnitude > 1e-6f)
+                    body.transform.localRotation = Quaternion.FromToRotation(d.normalized, Vector3.forward);
+            }
+            // scale to a 1.8 m tall character standing on the ground
+            var rends = body.GetComponentsInChildren<Renderer>();
+            if (rends.Length > 0)
+            {
+                var b = rends[0].bounds;
+                foreach (var r in rends) b.Encapsulate(r.bounds);
+                if (b.size.y > 0.01f)
+                {
+                    float k = HeroHeight / b.size.y;
+                    body.transform.localScale *= k;
+                    b = rends[0].bounds; foreach (var r in rends) b.Encapsulate(r.bounds);
+                }
+                body.transform.position += Vector3.up * (player.transform.position.y - b.min.y);
+            }
+            var mat = PlayerMat("HeroSkin", new Color(0.78f, 0.66f, 0.55f));
+            foreach (var r in rends)
+            {
+                var mats = new Material[r.sharedMaterials.Length];
+                for (int i = 0; i < mats.Length; i++) mats[i] = mat;
+                r.sharedMaterials = mats;
+                if (r is SkinnedMeshRenderer smr) smr.updateWhenOffscreen = true;
+            }
+
+            var animator = body.GetComponent<Animator>() ?? body.AddComponent<Animator>();
+            animator.runtimeAnimatorController = controller;
+            animator.applyRootMotion = false;
+            animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            var ca = player.AddComponent<ThorvayneCharacterAnimator>();
+            ca.animator = animator;
+            return true;
+        }
+
+        // Humanoid rig (works with Mixamo and Asset Store animations), looping clips named Idle/Walk/Run/Jump/Swim/Fly.
+        static void EnsureImportSettings()
+        {
+            var importer = AssetImporter.GetAtPath(HeroPath) as ModelImporter;
+            if (importer == null) return;
+            bool changed = false;
+            if (importer.animationType != ModelImporterAnimationType.Human)
+            {
+                importer.animationType = ModelImporterAnimationType.Human;
+                importer.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+                changed = true;
+            }
+            if (!importer.importAnimation) { importer.importAnimation = true; changed = true; }
+            var clips = importer.clipAnimations;
+            if (changed || clips == null || clips.Length == 0 || clips.Any(c => !c.loopTime || c.name.Contains("|")))
+            {
+                clips = importer.defaultClipAnimations;
+                foreach (var c in clips)
+                {
+                    int bar = c.name.LastIndexOf('|');
+                    if (bar >= 0) c.name = c.name.Substring(bar + 1);
+                    c.loopTime = true;
+                    c.lockRootRotation = c.lockRootHeightY = c.lockRootPositionXZ = true;
+                }
+                importer.clipAnimations = clips;
+                changed = true;
+            }
+            if (changed) importer.SaveAndReimport();
+        }
+
+        static AnimatorController BuildController()
+        {
+            var clips = AssetDatabase.LoadAllAssetsAtPath(HeroPath).OfType<AnimationClip>()
+                .Where(c => !c.name.StartsWith("__preview__")).ToList();
+            if (clips.Count == 0) { Debug.LogWarning("ThorvayneHero.fbx has no animation clips"); return null; }
+            AssetDatabase.DeleteAsset(ControllerPath);
+            var ac = AnimatorController.CreateAnimatorControllerAtPath(ControllerPath);
+            var sm = ac.layers[0].stateMachine;
+            foreach (var name in Clips)
+            {
+                var clip = clips.FirstOrDefault(c => c.name == name || c.name.EndsWith("|" + name));
+                if (clip == null) { Debug.LogWarning($"ThorvayneHero.fbx is missing the {name} clip"); continue; }
+                var st = sm.AddState(name);
+                st.motion = clip;
+                if (name == "Idle") sm.defaultState = st;
+            }
+            AssetDatabase.SaveAssets();
+            return ac;
+        }
+
+        static Transform FindDeep(Transform t, string name)
+        {
+            if (t.name == name || t.name.EndsWith(":" + name)) return t;
+            foreach (Transform c in t) { var r = FindDeep(c, name); if (r != null) return r; }
+            return null;
+        }
+
+        static Camera MainCamera()
+        {
+            var cam = Camera.main;
+            if (cam == null)
+            {
+                var go = new GameObject("Main Camera") { tag = "MainCamera" };
+                cam = go.AddComponent<Camera>();
+                go.AddComponent<AudioListener>();
+                Undo.RegisterCreatedObjectUndo(go, "Add Camera");
+            }
+            cam.nearClipPlane = 0.3f;
+            cam.farClipPlane = 4000f;
+            return cam;
+        }
+
+        static Material PlayerMat(string name, Color color)
+        {
+            string dir = "Assets/Thorvayne/Generated";
+            if (!AssetDatabase.IsValidFolder(dir)) AssetDatabase.CreateFolder("Assets/Thorvayne", "Generated");
+            string path = $"{dir}/Mat_{name}.mat";
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (mat == null)
+            {
+                var rp = GraphicsSettings.currentRenderPipeline;
+                string shader = rp == null ? "Standard" : rp.GetType().Name.Contains("HD") ? "HDRP/Lit" : "Universal Render Pipeline/Lit";
+                mat = new Material(Shader.Find(shader) ?? Shader.Find("Standard"));
+                AssetDatabase.CreateAsset(mat, path);
+            }
+            if (mat.HasProperty("_Color")) mat.color = color;
+            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+    }
+}
