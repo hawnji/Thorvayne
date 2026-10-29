@@ -100,17 +100,12 @@ namespace Thorvayne.WorldGen.EditorTools
                     body.transform.localRotation = Quaternion.FromToRotation(d.normalized, Vector3.forward);
             }
             // scale to a 1.8 m tall character standing on the ground
+            // (measured from the meshes' bind-pose bounds: a skinned renderer's live bounds aren't reliable in edit mode)
             var rends = body.GetComponentsInChildren<Renderer>();
-            if (rends.Length > 0)
+            if (MeshWorldBounds(rends, out var b) && b.size.y > 1e-5f)
             {
-                var b = rends[0].bounds;
-                foreach (var r in rends) b.Encapsulate(r.bounds);
-                if (b.size.y > 0.01f)
-                {
-                    float k = HeroHeight / b.size.y;
-                    body.transform.localScale *= k;
-                    b = rends[0].bounds; foreach (var r in rends) b.Encapsulate(r.bounds);
-                }
+                body.transform.localScale *= HeroHeight / b.size.y;
+                MeshWorldBounds(rends, out b);
                 body.transform.position += Vector3.up * (player.transform.position.y - b.min.y);
             }
             var mat = PlayerMat("HeroSkin", new Color(0.78f, 0.66f, 0.55f));
@@ -179,6 +174,26 @@ namespace Thorvayne.WorldGen.EditorTools
             }
             AssetDatabase.SaveAssets();
             return ac;
+        }
+
+        static bool MeshWorldBounds(Renderer[] rends, out Bounds result)
+        {
+            result = new Bounds(); bool any = false;
+            foreach (var r in rends)
+            {
+                Mesh mesh = null;
+                if (r is SkinnedMeshRenderer smr) mesh = smr.sharedMesh;
+                else { var mf = r.GetComponent<MeshFilter>(); if (mf != null) mesh = mf.sharedMesh; }
+                if (mesh == null) continue;
+                var mb = mesh.bounds;
+                for (int i = 0; i < 8; i++)
+                {
+                    var corner = mb.center + Vector3.Scale(mb.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1));
+                    var w = r.transform.TransformPoint(corner);
+                    if (!any) { result = new Bounds(w, Vector3.zero); any = true; } else result.Encapsulate(w);
+                }
+            }
+            return any;
         }
 
         static Transform FindDeep(Transform t, string name)
