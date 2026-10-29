@@ -18,7 +18,7 @@ def fix_run():
     rest3 = rig.data.bones['mixamorig:Hips'].matrix_local.to_3x3()
     W3 = rig.matrix_world.to_3x3()
     ground = min((rig.matrix_world @ rig.data.bones['mixamorig:' + n].head_local).z for n in ('LeftToe_End', 'RightToe_End', 'LeftFoot', 'RightFoot'))
-    frames = list(range(f0, f1 + 1)); D = []; low = []
+    frames = list(range(f0, f1 + 1)); D = []; low = []; out = []
     for f in frames:
         sc.frame_set(f)
         D.append(W3 @ (rest3 @ hb.location))
@@ -30,11 +30,31 @@ def fix_run():
         d.x -= mx
         d.y -= D[0].y + (D[-1].y - D[0].y) * t      # remove forward travel (in place)
         d.z -= shift
-        hb.location = rest3.inverted() @ (W3.inverted() @ d)
-        hb.keyframe_insert('location', frame=f)
+        out.append((f, d))
     print('run fixed: lifted by', shift, 'travel removed', D[-1].y - D[0].y)
+    return out
 
 # lighten the mesh (weights are kept by the decimate modifier)
+run_hips = fix_run()   # hips path of the run, measured in the original (tiny, rotated) units
+
+# ---- normalise: real-world metres, 1.8 m tall, feet at the origin, no object rotation/scale ----
+top0 = rig.matrix_world @ rig.data.bones['mixamorig:HeadTop_End'].head_local
+ground0 = min((rig.matrix_world @ rig.data.bones['mixamorig:' + n].head_local).z for n in ('LeftToe_End', 'RightToe_End', 'LeftFoot', 'RightFoot'))
+FACTOR = 1.8 / (top0.z - ground0)
+rig.animation_data.action = None
+for b in rig.pose.bones: b.location = (0, 0, 0); b.rotation_quaternion = (1, 0, 0, 0)
+bpy.ops.object.select_all(action='DESELECT')
+rig.select_set(True); mesh.select_set(True); bpy.context.view_layer.objects.active = rig
+rig.scale = rig.scale * FACTOR
+rig.location = (0, 0, -ground0 * FACTOR)
+bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+print('normalised by', FACTOR, 'rig mw identity:', rig.matrix_world.is_identity, 'mesh mw identity:', mesh.matrix_world.is_identity)
+rig.animation_data.action = run
+hb = rig.pose.bones['mixamorig:Hips']; rest3 = rig.data.bones['mixamorig:Hips'].matrix_local.to_3x3()
+for f, d in run_hips:
+    hb.location = rest3.inverted() @ (d * FACTOR)
+    hb.keyframe_insert('location', frame=f)
+
 bpy.context.view_layer.objects.active = mesh
 mod = mesh.modifiers.new('dec', 'DECIMATE'); mod.ratio = 40000 / len(mesh.data.polygons)
 bpy.ops.object.modifier_apply(modifier='dec')
@@ -145,7 +165,6 @@ def fly(t):
     add(sp, 'LeftLowerLeg', X, 15); add(sp, 'RightLowerLeg', X, 15)
     return sp, 0.0
 
-fix_run()
 sc.render.fps = 30
 make('Idle', 60, idle); make('Walk', 32, walk); make('Jump', 30, jump); make('Swim', 40, swim); make('Fly', 40, fly)
 rig.animation_data.action = bpy.data.actions['Idle']
