@@ -24,6 +24,7 @@ project, install **Universal RP** from Window > Package Manager > Unity Registry
   - `Editor/ThorvayneWorldBuilder.cs` + `MapData/` + `Tools/` — the earlier world built from the hand-drawn map
     (**Thorvayne > Build World From Map**).
   - `Scripts/` — test player controller, character animator, skills, inventory, woodcutting, game UI, `WorldMarker` tags.
+  - `Trees/` — real tree models that replace the placeholders (the broadleaf so far).
   - `Characters/ThorvayneHero.fbx` — Mixamo-rigged hero (Humanoid) with Idle/Walk/Run/Jump/Swim/Fly/Chop.
   - `README_RandomWorld.md` / `README.md` — how to use each tool.
 - `Extras/` — Blender source for the hero and the scripts used to build it (keep out of `Assets`).

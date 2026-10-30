@@ -244,7 +244,17 @@ public class ThorvayneWoodcutting : MonoBehaviour
         stump.transform.position = pos + Vector3.up * 0.15f;
         stump.transform.localScale = new Vector3(0.75f * width, 0.2f, 0.75f * width);
         var r = prefab != null ? prefab.GetComponentInChildren<Renderer>() : null;
-        if (r != null && r.sharedMaterials.Length > 0) stump.GetComponent<Renderer>().sharedMaterial = r.sharedMaterials[0];   // bark
+        if (r != null && r.sharedMaterials.Length > 0 && r.sharedMaterials[0] != null)
+        {
+            // plain bark colour (tree models have a texture made for their own shape)
+            var mat = new Material(r.sharedMaterials[0]);
+            foreach (var prop in new[] { "_BaseMap", "_MainTex", "_BaseColorMap" })
+                if (mat.HasProperty(prop)) mat.SetTexture(prop, null);
+            var bark = new Color(0.38f, 0.26f, 0.16f);
+            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", bark);
+            if (mat.HasProperty("_Color")) mat.SetColor("_Color", bark);
+            stump.GetComponent<Renderer>().sharedMaterial = mat;
+        }
         return stump;
     }
 

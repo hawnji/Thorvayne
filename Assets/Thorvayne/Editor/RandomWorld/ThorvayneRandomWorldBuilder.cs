@@ -505,13 +505,94 @@ namespace Thorvayne.WorldGen.EditorTools
             // order must match the TreeKind enum
             return new[]
             {
-                TreePrefab("Broadleaf", BuildBroadleaf(1f, 1f), bark, Mat("Leaves", new Color(0.26f, 0.5f, 0.2f))),
+                ModelTree("Broadleaf", 7f) ?? TreePrefab("Broadleaf", BuildBroadleaf(1f, 1f), bark, Mat("Leaves", new Color(0.26f, 0.5f, 0.2f))),
                 TreePrefab("Conifer", BuildConifer(), bark, Mat("ConiferLeaves", new Color(0.16f, 0.38f, 0.22f))),
                 TreePrefab("SnowPine", BuildConifer(), bark, Mat("SnowPineLeaves", new Color(0.72f, 0.82f, 0.82f))),
                 TreePrefab("Palm", BuildPalm(), palmBark, Mat("PalmLeaves", new Color(0.35f, 0.58f, 0.2f))),
                 TreePrefab("Shrub", BuildShrub(), bark, Mat("ShrubLeaves", new Color(0.45f, 0.5f, 0.22f))),
                 TreePrefab("SwampTree", BuildBroadleaf(1.3f, 0.7f), Mat("SwampBark", new Color(0.28f, 0.24f, 0.18f)), Mat("SwampLeaves", new Color(0.3f, 0.36f, 0.18f))),
             };
+        }
+
+        // ---- tree models ----
+        // A real tree model replaces a placeholder when Assets/Thorvayne/Trees/<name>.fbx exists, with child objects
+        // LOD0 (the tree, textured with <name>_Albedo.png) and LOD1 (crossed cards using <name>_Impostor.png).
+        // Extras/make_tree.py makes these from a high-poly .glb. Returns null when there is no model.
+        const string TreeModelDir = "Assets/Thorvayne/Trees";
+
+        static GameObject ModelTree(string name, float height)
+        {
+            string fbx = $"{TreeModelDir}/{name}.fbx";
+            var model = AssetDatabase.LoadAssetAtPath<GameObject>(fbx);
+            if (model == null) return null;
+            var importer = AssetImporter.GetAtPath(fbx) as ModelImporter;
+            if (importer != null && (importer.materialImportMode != ModelImporterMaterialImportMode.None || importer.importAnimation))
+            {
+                importer.materialImportMode = ModelImporterMaterialImportMode.None;
+                importer.importAnimation = false;
+                importer.SaveAndReimport();
+                model = AssetDatabase.LoadAssetAtPath<GameObject>(fbx);
+            }
+
+            var go = UnityEngine.Object.Instantiate(model);
+            go.name = name;
+            go.transform.position = Vector3.zero; go.transform.rotation = Quaternion.identity;
+            var lod0 = go.transform.Find("LOD0"); var lod1 = go.transform.Find("LOD1");
+            if (lod0 == null) { UnityEngine.Object.DestroyImmediate(go); Debug.LogWarning($"{fbx} has no LOD0 object"); return null; }
+            // make it the intended height whatever unit scale the FBX came in with
+            var r0 = lod0.GetComponent<MeshRenderer>();
+            float h = r0.bounds.size.y;
+            if (h > 0.01f) go.transform.localScale *= height / h;
+            if (Mathf.Abs(go.transform.localScale.x - 1f) > 0.01f)
+            {
+                // terrain trees ignore the prefab's own scale, so bake it into the children
+                float k = go.transform.localScale.x;
+                go.transform.localScale = Vector3.one;
+                foreach (Transform c in go.transform) { c.localScale *= k; c.localPosition *= k; }
+            }
+
+            var albedo = AssetDatabase.LoadAssetAtPath<Texture2D>($"{TreeModelDir}/{name}_Albedo.png");
+            var far = AssetDatabase.LoadAssetAtPath<Texture2D>($"{TreeModelDir}/{name}_Impostor.png");
+            r0.sharedMaterials = new[] { TreeMat($"Tree{name}", albedo, false) };
+            var lods = new List<LOD> { new LOD(lod1 != null ? 0.12f : 0.01f, new Renderer[] { r0 }) };
+            var r1 = lod1 != null ? lod1.GetComponent<MeshRenderer>() : null;
+            if (r1 != null)
+            {
+                r1.sharedMaterials = new[] { TreeMat($"Tree{name}Far", far, true) };
+                r1.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                lods.Add(new LOD(0.01f, new Renderer[] { r1 }));
+            }
+            var lod = go.AddComponent<LODGroup>();
+            lod.SetLODs(lods.ToArray());
+            lod.RecalculateBounds();
+            var col = go.AddComponent<CapsuleCollider>();
+            col.radius = 0.5f; col.height = 4f; col.center = new Vector3(0, 2f, 0);
+            var prefab = PrefabUtility.SaveAsPrefabAsset(go, $"{GenDir}/Tree_{name}.prefab");
+            UnityEngine.Object.DestroyImmediate(go);
+            return prefab;
+        }
+
+        // Textured, double-sided material for tree models; cutout = see-through where the picture is transparent.
+        static Material TreeMat(string name, Texture2D tex, bool cutout)
+        {
+            var mat = Mat(name, Color.white, 0.02f);
+            foreach (var prop in new[] { "_BaseMap", "_MainTex", "_BaseColorMap" })
+                if (mat.HasProperty(prop)) mat.SetTexture(prop, tex);
+            if (mat.HasProperty("_Cull")) mat.SetFloat("_Cull", 0);                       // URP: render both sides
+            if (mat.HasProperty("_DoubleSidedEnable")) mat.SetFloat("_DoubleSidedEnable", 1);   // HDRP
+            if (cutout)
+            {
+                mat.SetOverrideTag("RenderType", "TransparentCutout");
+                if (mat.HasProperty("_AlphaClip")) mat.SetFloat("_AlphaClip", 1);          // URP
+                if (mat.HasProperty("_AlphaCutoffEnable")) mat.SetFloat("_AlphaCutoffEnable", 1);   // HDRP
+                if (mat.HasProperty("_Mode")) mat.SetFloat("_Mode", 1);                    // Built-in Standard
+                if (mat.HasProperty("_Cutoff")) mat.SetFloat("_Cutoff", 0.5f);
+                if (mat.HasProperty("_AlphaCutoff")) mat.SetFloat("_AlphaCutoff", 0.5f);
+                mat.EnableKeyword("_ALPHATEST_ON");
+                mat.renderQueue = 2450;
+            }
+            EditorUtility.SetDirty(mat);
+            return mat;
         }
 
         static GameObject TreePrefab(string name, Mesh mesh, Material trunk, Material leaves)
