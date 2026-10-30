@@ -1,16 +1,21 @@
-# Adds a simple axe (object "Axe") held in the hero's right hand, parented to the RightHand bone, and re-exports
-# the FBX. Unity shows or hides it (ThorvayneWoodcutting); it moves with the hand in every animation.
+# Puts an axe (object "Axe") in the hero's right hand, parented to the RightHand bone, and re-exports
+# the FBX. The axe is the model made by make_axe.py (ThorvayneAxe.blend), or two plain boxes without one.
+# Unity shows or hides it (ThorvayneWoodcutting); it moves with the hand in every animation.
 # The grip is worked out from the rest pose: palm facing down/in, fingers along the arm, axe head on the thumb side,
 # handle tilted toward the fingers.
-# Usage: python add_axe.py -- ThorvayneHero_source.blend out.blend out.fbx
+# Usage: python add_axe.py -- ThorvayneHero_source.blend out.blend out.fbx [ThorvayneAxe.blend]
 import bpy, bmesh, sys
 from mathutils import Vector, Matrix
-src, out_blend, out_fbx = sys.argv[sys.argv.index('--')+1:][:3]
+args = sys.argv[sys.argv.index('--')+1:]
+src, out_blend, out_fbx = args[:3]
+model = args[3] if len(args) > 3 else None
 bpy.ops.wm.open_mainfile(filepath=src)
 sc = bpy.context.scene
 rig = bpy.data.objects['Armature']; hero = bpy.data.objects['HeroMesh']
 old = bpy.data.objects.get('Axe')
 if old: bpy.data.objects.remove(old)
+for n in ('AxeWood', 'AxeMetal'):                       # the old axe's materials, so the new ones keep their names
+    if n in bpy.data.materials: bpy.data.materials.remove(bpy.data.materials[n])
 rig.animation_data.action = None; rig.data.pose_position = 'REST'; bpy.context.view_layer.update()
 
 P = 'mixamorig:'
@@ -29,17 +34,24 @@ side = handle.cross(edge)
 grip = hand + fing * L * 0.6 + palm * 0.025
 M = Matrix((side, handle, edge)).transposed().to_4x4(); M.translation = grip   # local X side, Y along handle, Z blade edge
 
-me = bpy.data.meshes.new('Axe'); bm = bmesh.new()
-def box(center, size, mat):
-    r = bmesh.ops.create_cube(bm, size=1.0)
-    for v in r['verts']:
-        v.co = Vector((v.co.x * size[0], v.co.y * size[1], v.co.z * size[2])) + Vector(center)
-    for f in {f for v in r['verts'] for f in v.link_faces}: f.material_index = mat
-box((0, 0.23, 0), (0.035, 0.7, 0.035), 0)        # handle, wood
-box((0, 0.5, 0.07), (0.035, 0.16, 0.22), 1)      # head, metal
-bm.to_mesh(me); bm.free()
-for n, c in (('AxeWood', (0.45, 0.3, 0.15, 1)), ('AxeMetal', (0.62, 0.63, 0.66, 1))):
-    m = bpy.data.materials.get(n) or bpy.data.materials.new(n); m.diffuse_color = c; me.materials.append(m)
+if model:
+    # already in the grip's frame: origin in the hand, Y up the handle, Z the blade's edge
+    with bpy.data.libraries.load(model) as (src_data, dst):
+        dst.objects = ['AxeModel']
+    me = dst.objects[0].data; bpy.data.objects.remove(dst.objects[0])
+else:
+    me = bpy.data.meshes.new('Axe'); bm = bmesh.new()
+    def box(center, size, mat):
+        r = bmesh.ops.create_cube(bm, size=1.0)
+        for v in r['verts']:
+            v.co = Vector((v.co.x * size[0], v.co.y * size[1], v.co.z * size[2])) + Vector(center)
+        for f in {f for v in r['verts'] for f in v.link_faces}: f.material_index = mat
+    box((0, 0.23, 0), (0.035, 0.7, 0.035), 0)        # handle, wood
+    box((0, 0.5, 0.07), (0.035, 0.16, 0.22), 1)      # head, metal
+    bm.to_mesh(me); bm.free()
+    for n, c in (('AxeWood', (0.45, 0.3, 0.15, 1)), ('AxeMetal', (0.62, 0.63, 0.66, 1))):
+        m = bpy.data.materials.get(n) or bpy.data.materials.new(n); m.diffuse_color = c; me.materials.append(m)
+me.name = 'Axe'
 axe = bpy.data.objects.new('Axe', me); sc.collection.objects.link(axe)
 axe.matrix_world = M
 mw = axe.matrix_world.copy()
