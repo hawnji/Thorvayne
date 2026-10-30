@@ -93,7 +93,7 @@ Shrubs can't be chopped. XP and levels work like RuneScape (level 2 at 83 XP, 99
   preferably by a river, lake or coast, with the ground levelled under them. One town near the
   middle is the starter town (with a `PlayerSpawn` next to it). Each has a `WorldMarker`
   (type, danger tier 1-5, starter flag). Danger rises with distance from the start and in harsh
-  biomes. Names are random placeholders.
+  biomes. Names are random placeholders. Each place is laid out like a real town (see below).
 - **Roads** link every town (painted on the ground and smoothed into the slope), with simple
   wooden **bridges** where they cross rivers.
 - **Trees**: around 100k low-poly placeholders picked by biome: broadleaf, conifer, snowy pine,
@@ -115,6 +115,25 @@ Generate the world again to use it (with the same seed you get the same world, o
 To make another one from a .glb, run `Extras/make_tree.py` (Blender) with the name of the tree it replaces
 (`Conifer`, `SnowPine`, `Palm`, `Shrub`, `SwampTree`); the generator would then need one line to use it.
 
+## Town layout and houses
+Every city, town and village gets a plan (`Editor/RandomWorld/ThorvayneTownPlanner.cs`):
+- a **town square** in the middle (with the well in towns and the keep in cities),
+- **main streets** that carry on the roads coming into town, plus extra streets so the place opens
+  to several sides (2 in villages, 3 in towns, 4 in cities), and **ring streets** (one in towns, two in cities),
+- **houses** along the streets and around the square, each with its front to the street, never on a
+  street, in water, on steep ground or on top of each other (about 8 per village, 30 per town, 90 per city),
+- a short **path to each front door**. Streets, the square and the door paths are painted on the ground
+  with the path texture, like the roads.
+
+City walls are open where the main streets leave town. The plan only reads the world, so the terrain
+of a seed stays the same (seed 1234 is unchanged apart from the towns).
+
+The house is your ComfyUI model: `Assets/Thorvayne/Buildings/House.fbx` (8k triangles up close, 2k far away)
+with `House_Albedo.png`. It is 10.5 x 6.9 m with its stone base partly sunk into the ground, and has a
+collider so you can't walk through it. To make another from a .glb, run `Extras/make_house.py` (Blender);
+run it with `sides` first to see which side has the door. Without the model, towns use plain box houses
+in the same layout.
+
 ## Settings in the window
 - **Land vs sea**, **Mountains**, **Rivers**, **Max lakes**, **Forest density**: shape of the world.
 - **Cities / Towns / Villages / Cave entrances**: how many to place (fewer may fit on small islands).
@@ -127,6 +146,8 @@ always renders correctly in URP.
 ## Files
 - `Editor/RandomWorld/ThorvayneWorldGen.cs`: the generator itself (plain C#, no Unity code).
 - `Editor/RandomWorld/ThorvayneRandomWorldBuilder.cs`: the window and the code that builds the scene.
+- `Editor/RandomWorld/ThorvayneTownPlanner.cs`: town squares, streets, house plots and door paths.
+- `Buildings/House.fbx`, `House_Albedo.png`: the town house.
 - `Editor/RandomWorld/ThorvayneTestPlayerSetup.cs`: adds the Test Player and camera.
 - `Scripts/ThorvaynePlayer.cs`: the test character's movement, camera and on-screen info.
 - `Scripts/ThorvayneCharacterAnimator.cs`: picks the character animation to play.

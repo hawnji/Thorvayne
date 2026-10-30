@@ -106,6 +106,7 @@ namespace Thorvayne.WorldGen.EditorTools
             {
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 var r = WorldGenerator.Generate(s, (step, t) => Progress(step, t * 0.6f));
+                var towns = TownPlanner.PlanAll(r);
                 EnsureFolder(GenDir);
                 matCache.Clear();
 
@@ -117,6 +118,7 @@ namespace Thorvayne.WorldGen.EditorTools
                 var layers = BuildLayers();
                 Progress("Tree models", 0.62f);
                 var protos = BuildTreePrototypes();
+                var house = HousePrefab();
 
                 int tiles = s.tilesPerSide;
                 float tileSize = s.worldSize / tiles;
@@ -128,7 +130,7 @@ namespace Thorvayne.WorldGen.EditorTools
                     for (int tx = 0; tx < tiles; tx++)
                     {
                         Progress($"Terrain tile {tz * tiles + tx + 1} / {tiles * tiles}", 0.64f + 0.26f * (tz * tiles + tx) / (tiles * tiles));
-                        terrains[tx, tz] = BuildTile(r, tx, tz, tileSize, layers, protos, treesByTile[tz * tiles + tx], terrainParent);
+                        terrains[tx, tz] = BuildTile(r, tx, tz, tileSize, layers, protos, treesByTile[tz * tiles + tx], towns, terrainParent);
                     }
                 for (int tz = 0; tz < tiles; tz++)
                     for (int tx = 0; tx < tiles; tx++)
@@ -140,7 +142,7 @@ namespace Thorvayne.WorldGen.EditorTools
                 BuildRiversAndLakes(root.transform, r, tiles, tileSize);
 
                 Progress("Towns, caves and bridges", 0.94f);
-                var spawn = PlaceSettlements(root.transform, r);
+                var spawn = PlaceSettlements(root.transform, r, towns, house);
                 PlaceCaves(root.transform, r);
                 PlaceBridges(root.transform, r);
 
@@ -169,7 +171,7 @@ namespace Thorvayne.WorldGen.EditorTools
 
         // ---------------- terrain ----------------
         static Terrain BuildTile(WorldGenResult r, int tx, int tz, float tileSize, TerrainLayer[] layers, GameObject[] protos,
-                                 List<TreePlacement> trees, Transform parent)
+                                 List<TreePlacement> trees, List<TownPlan> towns, Transform parent)
         {
             var s = r.settings;
             int res = s.tileResolution, step = res - 1;
@@ -190,12 +192,24 @@ namespace Thorvayne.WorldGen.EditorTools
             int n = WorldGenResult.LayerCount;
             var maps = new float[ares, ares, n];
             float ox = tx * tileSize, oz = tz * tileSize, px = tileSize / ares;
+            // the towns on this tile, for their streets, squares and door paths
+            int pathLayer = Array.IndexOf(WorldGenResult.Layers, "path");
+            var here = towns.Where(t => t.settlement.x + t.settlement.radius * 1.2f > ox && t.settlement.x - t.settlement.radius * 1.2f < ox + tileSize &&
+                                        t.settlement.z + t.settlement.radius * 1.2f > oz && t.settlement.z - t.settlement.radius * 1.2f < oz + tileSize).ToList();
             Parallel.For(0, ares, y =>
             {
                 var w = new float[n];
                 for (int x = 0; x < ares; x++)
                 {
-                    r.SplatAt(ox + (x + 0.5f) * px, oz + (y + 0.5f) * px, w);
+                    float wx = ox + (x + 0.5f) * px, wz = oz + (y + 0.5f) * px;
+                    r.SplatAt(wx, wz, w);
+                    foreach (var town in here)
+                    {
+                        float p = town.PathWeight(wx, wz);
+                        if (p <= 0) continue;
+                        for (int l = 0; l < n; l++) w[l] *= 1 - p;
+                        w[pathLayer] += p;
+                    }
                     for (int l = 0; l < n; l++) maps[y, x, l] = w[l];
                 }
             });
@@ -352,25 +366,25 @@ namespace Thorvayne.WorldGen.EditorTools
         }
 
         // ---------------- settlements, caves, bridges ----------------
-        static Transform PlaceSettlements(Transform root, WorldGenResult r)
+        static Transform PlaceSettlements(Transform root, WorldGenResult r, List<TownPlan> towns, GameObject house)
         {
             var parent = new GameObject("Towns & Cities").transform;
             parent.SetParent(root, false);
-            var rnd = new System.Random(r.settings.seed);
             Transform spawn = null;
-            foreach (var st in r.settlements)
+            foreach (var plan in towns)
             {
+                var st = plan.settlement;
                 var go = new GameObject($"{st.name} ({st.type})");
                 go.transform.SetParent(parent, false);
                 go.transform.position = new Vector3(st.x, r.HeightAt(st.x, st.z), st.z);
                 var wm = go.AddComponent<WorldMarker>();
                 wm.markerType = st.type; wm.dangerTier = st.dangerTier; wm.isStarter = st.isStarter;
-                BuildSettlement(go.transform, st, rnd);
+                BuildSettlement(go.transform, plan, house);
                 if (st.isStarter)
                 {
                     spawn = new GameObject("PlayerSpawn").transform;
                     spawn.SetParent(root, false);
-                    var p = new Vector3(st.x, 0, st.z - st.radius * 0.5f);
+                    var p = new Vector3(st.x, 0, st.z - plan.plazaRadius * 0.6f);   // on the town square
                     p.y = r.HeightAt(p.x, p.z) + 1f;
                     spawn.position = p;
                 }
@@ -378,38 +392,36 @@ namespace Thorvayne.WorldGen.EditorTools
             return spawn;
         }
 
-        static void BuildSettlement(Transform t, Settlement st, System.Random rnd)
+        static void BuildSettlement(Transform t, TownPlan plan, GameObject house)
         {
+            var st = plan.settlement;
             // Brighter, friendlier colours near the start; darker toward dangerous zones.
             float dark = (st.dangerTier - 1) / 4f;
             var wall = Mat($"Wall_T{st.dangerTier}", Color.Lerp(new Color(0.93f, 0.86f, 0.72f), new Color(0.22f, 0.2f, 0.22f), dark));
             var roof = Mat($"Roof_T{st.dangerTier}", Color.Lerp(new Color(0.85f, 0.3f, 0.2f), new Color(0.35f, 0.08f, 0.1f), dark));
             var stone = Mat("Stone", new Color(0.55f, 0.55f, 0.58f));
+            Houses(t, plan, house, wall, roof);
             switch (st.type)
             {
-                case "village":
-                    Houses(t, 7, st.radius * 0.7f, wall, roof, rnd);
-                    break;
                 case "town":
-                    Houses(t, 16, st.radius * 0.75f, wall, roof, rnd);
                     Cyl(t, "Well", Vector3.zero, 1.2f, 1.2f, stone);
                     break;
                 case "city":
-                    Houses(t, 36, st.radius * 0.72f, wall, roof, rnd);
                     Box(t, "Keep", Vector3.zero, new Vector3(12, 20, 12), stone);
-                    // ring wall with four towers and gaps for gates
+                    // ring wall with towers, open where the main streets leave town
                     float rw = st.radius * 0.88f;
                     int segs = 24;
                     for (int i = 0; i < segs; i++)
                     {
-                        if (i % 6 == 0) continue;
                         float a = (i + 0.5f) / segs * Mathf.PI * 2f;
+                        if (NearGate(plan, a, 0.2f)) continue;
                         var w = Box(t, "Wall", new Vector3(Mathf.Cos(a) * rw, 0, Mathf.Sin(a) * rw), new Vector3(2f, 7f, 2f * Mathf.PI * rw / segs + 0.5f), stone);
                         w.localRotation = Quaternion.Euler(0, -a * Mathf.Rad2Deg, 0);
                     }
                     for (int i = 0; i < 4; i++)
                     {
                         float a = (i * 6 + 3 + 0.5f) / segs * Mathf.PI * 2f;
+                        if (NearGate(plan, a, 0.3f)) continue;
                         var c = new Vector3(Mathf.Cos(a) * rw, 0, Mathf.Sin(a) * rw);
                         Cyl(t, "Tower", c, 3f, 13f, stone);
                         Cyl(t, "TowerRoof", c + Vector3.up * 13f, 3.4f, 2f, roof);
@@ -418,17 +430,31 @@ namespace Thorvayne.WorldGen.EditorTools
             }
         }
 
-        static void Houses(Transform t, int count, float radius, Material wall, Material roof, System.Random rnd)
+        static bool NearGate(TownPlan plan, float a, float within)
         {
-            for (int i = 0; i < count; i++)
+            foreach (var g in plan.gateAngles)
+                if (Mathf.Abs(Mathf.DeltaAngle(a * Mathf.Rad2Deg, g * Mathf.Rad2Deg)) < within * Mathf.Rad2Deg) return true;
+            return false;
+        }
+
+        // The houses TownPlanner laid out, each facing its street: the house model, or a plain box house without one.
+        static void Houses(Transform t, TownPlan plan, GameObject house, Material wall, Material roof)
+        {
+            foreach (var h in plan.houses)
             {
-                float a = (float)rnd.NextDouble() * Mathf.PI * 2f, r = 8f + (float)rnd.NextDouble() * (radius - 8f);
-                var p = new Vector3(Mathf.Cos(a) * r, 0, Mathf.Sin(a) * r);
-                float yaw = (float)rnd.NextDouble() * 360f;
-                var h = Box(t, "House", p, new Vector3(4, 3, 5), wall);
-                h.localRotation = Quaternion.Euler(0, yaw, 0);
-                var rf = Box(t, "Roof", p + Vector3.up * 2.4f, new Vector3(3.2f, 3.2f, 5.4f), roof);
-                rf.localRotation = Quaternion.Euler(0, yaw, 45f);
+                var pos = new Vector3(h.x, h.y, h.z);
+                var rot = Quaternion.Euler(0, h.yaw, 0);
+                if (house != null)
+                {
+                    var go = (GameObject)PrefabUtility.InstantiatePrefab(house);
+                    go.transform.SetParent(t, false);
+                    go.transform.SetPositionAndRotation(pos, rot);
+                    continue;
+                }
+                var b = Box(t, "House", Vector3.zero, new Vector3(TownPlanner.HouseLength - 1f, 3, TownPlanner.HouseDepth - 1f), wall);
+                b.SetPositionAndRotation(pos + Vector3.up * 1.5f, rot);
+                var rf = Box(t, "Roof", Vector3.zero, new Vector3(TownPlanner.HouseLength - 0.6f, 3.6f, 3.6f), roof);
+                rf.SetPositionAndRotation(pos + Vector3.up * 3.4f, rot * Quaternion.Euler(45f, 0, 0));
             }
         }
 
@@ -590,23 +616,9 @@ namespace Thorvayne.WorldGen.EditorTools
             var r0 = lod0.GetComponent<MeshRenderer>();
             float h = r0.bounds.size.y;
             float k = h > 0.01f ? height / h : 1f;
-            // Bake each part's position, rotation (FBX files often carry a -90 degree turn) and that scale into its
-            // mesh, so every part sits at identity under the root. Terrain trees don't reliably keep child transforms:
-            // trees redrawn after being changed at runtime (felled and regrown) came back lying on their side.
-            foreach (Transform c in go.transform)
-            {
-                var mf = c.GetComponent<MeshFilter>();
-                if (mf == null || mf.sharedMesh == null) continue;
-                var m = Matrix4x4.Scale(Vector3.one * k) * go.transform.worldToLocalMatrix * c.localToWorldMatrix;
-                var mesh = UnityEngine.Object.Instantiate(mf.sharedMesh);
-                var v = mesh.vertices; var n = mesh.normals;
-                for (int i = 0; i < v.Length; i++) v[i] = m.MultiplyPoint3x4(v[i]);
-                for (int i = 0; i < n.Length; i++) n[i] = m.MultiplyVector(n[i]).normalized;
-                mesh.vertices = v; if (n.Length == v.Length) mesh.normals = n;
-                mesh.RecalculateBounds();
-                mf.sharedMesh = SaveMesh(mesh, $"{GenDir}/Mesh_Tree{name}_{c.name}.asset");
-                c.localPosition = Vector3.zero; c.localRotation = Quaternion.identity; c.localScale = Vector3.one;
-            }
+            // Terrain trees don't reliably keep child transforms: trees redrawn after being changed at runtime
+            // (felled and regrown) came back lying on their side.
+            BakeParts(go, k, $"Tree{name}");
 
             var albedo = AssetDatabase.LoadAssetAtPath<Texture2D>($"{TreeModelDir}/{name}_Albedo.png");
             var far = AssetDatabase.LoadAssetAtPath<Texture2D>($"{TreeModelDir}/{name}_Impostor.png");
@@ -625,6 +637,76 @@ namespace Thorvayne.WorldGen.EditorTools
             var col = go.AddComponent<CapsuleCollider>();
             col.radius = 0.5f; col.height = 4f; col.center = new Vector3(0, 2f, 0);
             var prefab = PrefabUtility.SaveAsPrefabAsset(go, $"{GenDir}/Tree_{name}.prefab");
+            UnityEngine.Object.DestroyImmediate(go);
+            return prefab;
+        }
+
+        // Bakes each part's position, rotation (FBX files often carry a -90 degree turn) and a scale into its mesh,
+        // so every part sits at identity under the root. The meshes are saved as Mesh_<prefix>_<part>.asset.
+        static void BakeParts(GameObject go, float k, string prefix)
+        {
+            foreach (Transform c in go.transform)
+            {
+                var mf = c.GetComponent<MeshFilter>();
+                if (mf == null || mf.sharedMesh == null) continue;
+                var m = Matrix4x4.Scale(Vector3.one * k) * go.transform.worldToLocalMatrix * c.localToWorldMatrix;
+                var mesh = UnityEngine.Object.Instantiate(mf.sharedMesh);
+                var v = mesh.vertices; var n = mesh.normals;
+                for (int i = 0; i < v.Length; i++) v[i] = m.MultiplyPoint3x4(v[i]);
+                for (int i = 0; i < n.Length; i++) n[i] = m.MultiplyVector(n[i]).normalized;
+                mesh.vertices = v; if (n.Length == v.Length) mesh.normals = n;
+                mesh.RecalculateBounds();
+                mf.sharedMesh = SaveMesh(mesh, $"{GenDir}/Mesh_{prefix}_{c.name}.asset");
+                c.localPosition = Vector3.zero; c.localRotation = Quaternion.identity; c.localScale = Vector3.one;
+            }
+        }
+
+        // ---- buildings ----
+        // The town house: Assets/Thorvayne/Buildings/House.fbx (objects LOD0 and LOD1, textured with House_Albedo.png),
+        // made by Extras/make_house.py, front facing +Z with the pivot at ground level. Null when there is no model.
+        const string BuildingDir = "Assets/Thorvayne/Buildings";
+
+        static GameObject HousePrefab()
+        {
+            string fbx = $"{BuildingDir}/House.fbx";
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(fbx) == null) return null;
+            foreach (var f in new[] { fbx, $"{BuildingDir}/House_Albedo.png" })
+                if (File.Exists(f)) AssetDatabase.ImportAsset(f, ImportAssetOptions.ForceUpdate);
+            var importer = AssetImporter.GetAtPath(fbx) as ModelImporter;
+            if (importer != null && (importer.materialImportMode != ModelImporterMaterialImportMode.None || importer.importAnimation))
+            {
+                importer.materialImportMode = ModelImporterMaterialImportMode.None;
+                importer.importAnimation = false;
+                importer.SaveAndReimport();
+            }
+            var go = UnityEngine.Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(fbx));
+            go.name = "House";
+            go.transform.position = Vector3.zero; go.transform.rotation = Quaternion.identity;
+            var lod0 = go.transform.Find("LOD0"); var lod1 = go.transform.Find("LOD1");
+            if (lod0 == null) { UnityEngine.Object.DestroyImmediate(go); Debug.LogWarning($"{fbx} has no LOD0 object"); return null; }
+            // the intended size whatever unit scale the FBX came in with (the long side runs along X)
+            var r0 = lod0.GetComponent<MeshRenderer>();
+            float len = r0.bounds.size.x;
+            BakeParts(go, len > 0.01f ? 10.5f / len : 1f, "House");
+
+            var mat = TreeMat("House", AssetDatabase.LoadAssetAtPath<Texture2D>($"{BuildingDir}/House_Albedo.png"), false);
+            var lods = new List<LOD>();
+            foreach (var part in new[] { lod0, lod1 })
+            {
+                var rend = part != null ? part.GetComponent<MeshRenderer>() : null;
+                if (rend == null) continue;
+                rend.sharedMaterials = new[] { mat };
+                lods.Add(new LOD(lods.Count == 0 ? (lod1 != null ? 0.2f : 0.015f) : 0.015f, new Renderer[] { rend }));
+            }
+            var lod = go.AddComponent<LODGroup>();
+            lod.SetLODs(lods.ToArray());
+            lod.RecalculateBounds();
+            // solid walls: a box around the house below the roof
+            var b = r0.bounds;
+            var col = go.AddComponent<BoxCollider>();
+            col.center = new Vector3(b.center.x, b.size.y * 0.2f, b.center.z);
+            col.size = new Vector3(b.size.x * 0.9f, b.size.y * 0.4f, b.size.z * 0.85f);
+            var prefab = PrefabUtility.SaveAsPrefabAsset(go, $"{GenDir}/Building_House.prefab");
             UnityEngine.Object.DestroyImmediate(go);
             return prefab;
         }
