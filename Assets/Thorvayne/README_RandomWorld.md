@@ -91,6 +91,14 @@ Shrubs can't be chopped. XP and levels work like RuneScape (level 2 at 83 XP, 99
 Generating again replaces the previous random world (Ctrl+Z brings it back). It does not touch the
 world built from the hand-drawn map, which lives under its own object.
 
+## Tree models
+Real tree models replace the placeholders when they are in `Assets/Thorvayne/Trees/`. Right now the
+**broadleaf tree** is your ComfyUI model: `Broadleaf.fbx` holds a 12k-triangle version for up close (`LOD0`) and two
+crossed picture cards for far away (`LOD1`), with `Broadleaf_Albedo.png` and `Broadleaf_Impostor.png`.
+Generate the world again to use it (with the same seed you get the same world, only with the new trees).
+To make another one from a .glb, run `Extras/make_tree.py` (Blender) with the name of the tree it replaces
+(`Conifer`, `SnowPine`, `Palm`, `Shrub`, `SwampTree`); the generator would then need one line to use it.
+
 ## Settings in the window
 - **Land vs sea**, **Mountains**, **Rivers**, **Max lakes**, **Forest density**: shape of the world.
 - **Cities / Towns / Villages / Cave entrances**: how many to place (fewer may fit on small islands).
