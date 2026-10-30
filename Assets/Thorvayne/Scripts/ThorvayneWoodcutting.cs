@@ -296,6 +296,8 @@ public class ThorvayneWoodcutting : MonoBehaviour
         if (like != null && like.sharedMaterial != null)
         {
             var mat = new Material(like.sharedMaterial);
+            foreach (var prop in new[] { "_BaseMap", "_MainTex", "_BaseColorMap" })   // plain colour, not the character's skin
+                if (mat.HasProperty(prop)) mat.SetTexture(prop, null);
             if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
             if (mat.HasProperty("_Color")) mat.SetColor("_Color", color);
             go.GetComponent<Renderer>().sharedMaterial = mat;

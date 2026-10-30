@@ -16,6 +16,7 @@ namespace Thorvayne.WorldGen.EditorTools
         const string PlayerName = "Test Player";
         const string HeroPath = "Assets/Thorvayne/Characters/ThorvayneHero.fbx";
         const string ControllerPath = "Assets/Thorvayne/Characters/ThorvayneHero.controller";
+        const string SkinPath = "Assets/Thorvayne/Characters/ThorvayneHero_Skin.png";   // optional colour texture
         static readonly string[] Clips = { "Idle", "Walk", "Run", "Jump", "Swim", "Fly", "Chop" };
         const float HeroHeight = 1.8f;
 
@@ -124,7 +125,10 @@ namespace Thorvayne.WorldGen.EditorTools
                 float skin = player.GetComponent<CharacterController>().skinWidth;
                 body.transform.position += Vector3.up * (player.transform.position.y - b.min.y - skin);
             }
-            var mat = PlayerMat("HeroSkin", new Color(0.78f, 0.66f, 0.55f));
+            var skinTex = AssetDatabase.LoadAssetAtPath<Texture2D>(SkinPath);
+            var mat = PlayerMat("HeroSkin", skinTex != null ? Color.white : new Color(0.78f, 0.66f, 0.55f));
+            foreach (var prop in new[] { "_BaseMap", "_MainTex", "_BaseColorMap" })   // URP, Built-in, HDRP
+                if (mat.HasProperty(prop)) mat.SetTexture(prop, skinTex);
             foreach (var r in rends)
             {
                 var mats = new Material[r.sharedMaterials.Length];
