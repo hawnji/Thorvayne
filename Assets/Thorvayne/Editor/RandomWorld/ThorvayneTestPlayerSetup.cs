@@ -16,7 +16,7 @@ namespace Thorvayne.WorldGen.EditorTools
         const string PlayerName = "Test Player";
         const string HeroPath = "Assets/Thorvayne/Characters/ThorvayneHero.fbx";
         const string ControllerPath = "Assets/Thorvayne/Characters/ThorvayneHero.controller";
-        static readonly string[] Clips = { "Idle", "Walk", "Run", "Jump", "Swim", "Fly" };
+        static readonly string[] Clips = { "Idle", "Walk", "Run", "Jump", "Swim", "Fly", "Chop" };
         const float HeroHeight = 1.8f;
 
         [MenuItem("Thorvayne/Add Test Player")]
@@ -31,6 +31,15 @@ namespace Thorvayne.WorldGen.EditorTools
             var sea = GameObject.Find("Thorvayne Random World/Sea") ?? GameObject.Find("Sea");
             var player = Setup(spawn.transform.position, sea != null ? sea.transform.position.y : -10000f);
             Selection.activeGameObject = player;
+        }
+
+        [MenuItem("Thorvayne/Reset Test Player Progress")]
+        static void ResetProgress()
+        {
+            if (!EditorUtility.DisplayDialog("Thorvayne", "Clear the test player's skill levels and inventory?", "Clear", "Cancel")) return;
+            ThorvayneSkills.ClearSave();
+            ThorvayneInventory.ClearSave();
+            PlayerPrefs.Save();
         }
 
         public static GameObject Setup(Vector3 position, float seaLevel)
@@ -66,6 +75,11 @@ namespace Thorvayne.WorldGen.EditorTools
             var p = player.AddComponent<ThorvaynePlayer>();
             p.seaLevel = seaLevel;
             p.cam = MainCamera();
+            // gameplay: skills, inventory, on-screen UI, woodcutting
+            player.AddComponent<ThorvayneSkills>();
+            player.AddComponent<ThorvayneInventory>();
+            player.AddComponent<ThorvayneGameUI>();
+            player.AddComponent<ThorvayneWoodcutting>();
 
             Undo.RegisterCreatedObjectUndo(player, "Add Test Player");
             EditorSceneManager.MarkSceneDirty(player.scene);
@@ -142,7 +156,9 @@ namespace Thorvayne.WorldGen.EditorTools
             }
             if (!importer.importAnimation) { importer.importAnimation = true; changed = true; }
             var clips = importer.clipAnimations;
-            if (changed || clips == null || clips.Length == 0 || clips.Any(c => !c.loopTime || !c.heightFromFeet || c.name.Contains("|")))
+            // also redo it when the FBX gained clips (e.g. Chop) since the clip list was last set
+            if (changed || clips == null || clips.Length == 0 || clips.Length != importer.defaultClipAnimations.Length
+                || clips.Any(c => !c.loopTime || !c.heightFromFeet || c.name.Contains("|")))
             {
                 clips = importer.defaultClipAnimations;
                 foreach (var c in clips)
