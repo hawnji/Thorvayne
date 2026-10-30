@@ -9,7 +9,7 @@ using UnityEngine.InputSystem.Controls;
 // WASD move, mouse look, Shift sprint, Space jump, mouse wheel zoom,
 // F fly mode (Space up / Ctrl down), T teleport to the next town or cave, R back to spawn,
 // Esc frees the mouse (click to grab it again).
-// E chop trees, I / Tab inventory, K skills (ThorvayneWoodcutting, ThorvayneGameUI).
+// E chop trees, I / Tab inventory, G equipment, K skills (ThorvayneWoodcutting, ThorvayneGameUI).
 // Works with both the new Input System and the old Input Manager.
 [RequireComponent(typeof(CharacterController))]
 public class ThorvaynePlayer : MonoBehaviour
@@ -66,6 +66,7 @@ public class ThorvaynePlayer : MonoBehaviour
         // gameplay parts (also added here so test players from older versions get them)
         if (GetComponent<ThorvayneSkills>() == null) gameObject.AddComponent<ThorvayneSkills>();
         if (GetComponent<ThorvayneInventory>() == null) gameObject.AddComponent<ThorvayneInventory>();
+        if (GetComponent<ThorvayneEquipment>() == null) gameObject.AddComponent<ThorvayneEquipment>();
         if (GetComponent<ThorvayneGameUI>() == null) gameObject.AddComponent<ThorvayneGameUI>();
         if (GetComponent<ThorvayneWoodcutting>() == null) gameObject.AddComponent<ThorvayneWoodcutting>();
     }
@@ -230,7 +231,7 @@ public class ThorvaynePlayer : MonoBehaviour
         var p = transform.position;
         string mode = flying ? "FLYING" : swimming ? "swimming" : "walking";
         string text = $"{nearestText}\nPosition {p.x:0}, {p.z:0}   height {p.y:0} m   {mode}\n" +
-                      "WASD move · Shift sprint · Space jump · wheel zoom\nF fly · T next town/cave · R spawn · Esc free mouse\nE chop tree · I inventory · K skills";
+                      "WASD move · Shift sprint · Space jump · wheel zoom\nF fly · T next town/cave · R spawn · Esc free mouse\nE chop tree · I inventory · G equipment · K skills";
         GUI.Box(new Rect(10, 10, 430, 94), "");
         GUI.Label(new Rect(18, 14, 420, 90), text);
         if (eventTimer > 0)

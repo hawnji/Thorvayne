@@ -37,9 +37,10 @@ namespace Thorvayne.WorldGen.EditorTools
         [MenuItem("Thorvayne/Reset Test Player Progress")]
         static void ResetProgress()
         {
-            if (!EditorUtility.DisplayDialog("Thorvayne", "Clear the test player's skill levels and inventory?", "Clear", "Cancel")) return;
+            if (!EditorUtility.DisplayDialog("Thorvayne", "Clear the test player's skill levels, inventory and equipment?", "Clear", "Cancel")) return;
             ThorvayneSkills.ClearSave();
             ThorvayneInventory.ClearSave();
+            ThorvayneEquipment.ClearSave();
             PlayerPrefs.Save();
         }
 
@@ -79,6 +80,7 @@ namespace Thorvayne.WorldGen.EditorTools
             // gameplay: skills, inventory, on-screen UI, woodcutting
             player.AddComponent<ThorvayneSkills>();
             player.AddComponent<ThorvayneInventory>();
+            player.AddComponent<ThorvayneEquipment>();
             player.AddComponent<ThorvayneGameUI>();
             player.AddComponent<ThorvayneWoodcutting>();
 
@@ -125,7 +127,8 @@ namespace Thorvayne.WorldGen.EditorTools
             }
             // scale to a 1.8 m tall character standing on the ground
             // (measured from the meshes' bind-pose bounds: a skinned renderer's live bounds aren't reliable in edit mode)
-            var rends = body.GetComponentsInChildren<Renderer>();
+            // the axe (Extras/add_axe.py) sits in the right hand; keep it out of sizing and skin
+            var rends = body.GetComponentsInChildren<Renderer>(true).Where(r => r.name != "Axe").ToArray();
             if (MeshWorldBounds(rends, out var b) && b.size.y > 1e-5f)
             {
                 body.transform.localScale *= HeroHeight / b.size.y;
@@ -144,6 +147,15 @@ namespace Thorvayne.WorldGen.EditorTools
                 for (int i = 0; i < mats.Length; i++) mats[i] = mat;
                 r.sharedMaterials = mats;
                 if (r is SkinnedMeshRenderer smr) smr.updateWhenOffscreen = true;
+            }
+
+            var axe = FindDeep(body.transform, "Axe");
+            if (axe != null)
+            {
+                var ar = axe.GetComponent<Renderer>();
+                if (ar != null)
+                    ar.sharedMaterials = new[] { PlayerMat("AxeWood", new Color(0.45f, 0.3f, 0.15f)), PlayerMat("AxeMetal", new Color(0.62f, 0.63f, 0.66f)) };
+                axe.gameObject.SetActive(false);   // shown while an axe is equipped or in use
             }
 
             var animator = body.GetComponent<Animator>() ?? body.AddComponent<Animator>();

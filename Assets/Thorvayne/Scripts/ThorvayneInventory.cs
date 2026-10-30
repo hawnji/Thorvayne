@@ -10,10 +10,18 @@ public static class ThorvayneItems
         public string id, name;
         public Color color;
         public bool stackable;
+        public string slot;     // equipment slot (ThorvayneEquipment.Slots), or null if it can't be worn
+        public string skill;    // skill this tool or gear needs, e.g. Woodcutting for axes
+        public int level = 1;   // level needed in that skill to use it
+        public int power;       // tool tier: better axes chop faster
     }
 
     static readonly Dictionary<string, Item> items = new Dictionary<string, Item>();
     static void Add(string id, string name, Color color, bool stackable = false) { items[id] = new Item { id = id, name = name, color = color, stackable = stackable }; }
+    static void Gear(string id, string name, Color color, string slot, string skill, int level, int power)
+    {
+        items[id] = new Item { id = id, name = name, color = color, slot = slot, skill = skill, level = level, power = power };
+    }
 
     static ThorvayneItems()
     {
@@ -22,9 +30,18 @@ public static class ThorvayneItems
         Add("palm_logs", "Palm logs", new Color(0.8f, 0.66f, 0.42f));
         Add("swamp_logs", "Swampwood logs", new Color(0.35f, 0.3f, 0.2f));
         Add("frost_logs", "Frost pine logs", new Color(0.72f, 0.8f, 0.86f));
+
+        // axes: wielded in the Weapon slot (or carried in the inventory) to chop trees
+        Gear("bronze_axe", "Bronze axe", new Color(0.72f, 0.46f, 0.24f), "Weapon", "Woodcutting", 1, 1);
+        Gear("iron_axe", "Iron axe", new Color(0.45f, 0.45f, 0.48f), "Weapon", "Woodcutting", 1, 2);
+        Gear("steel_axe", "Steel axe", new Color(0.72f, 0.74f, 0.77f), "Weapon", "Woodcutting", 6, 3);
+        Gear("mithril_axe", "Mithril axe", new Color(0.33f, 0.38f, 0.7f), "Weapon", "Woodcutting", 21, 4);
+        Gear("adamant_axe", "Adamant axe", new Color(0.3f, 0.55f, 0.35f), "Weapon", "Woodcutting", 31, 5);
+        Gear("rune_axe", "Rune axe", new Color(0.3f, 0.7f, 0.82f), "Weapon", "Woodcutting", 41, 6);
     }
 
     public static Item Get(string id) { return id != null && items.TryGetValue(id, out var it) ? it : null; }
+    public static bool IsAxe(Item it) { return it != null && it.skill == "Woodcutting" && it.power > 0; }
 }
 
 // 28 slots, like RuneScape. Logs take one slot each; stackable items share a slot.
@@ -73,6 +90,14 @@ public class ThorvayneInventory : MonoBehaviour
     {
         if (index < 0 || index >= Size || slots[index] == null) return;
         slots[index] = null;
+        Save();
+    }
+
+    public int FirstFree() { for (int i = 0; i < Size; i++) if (slots[i] == null) return i; return -1; }
+
+    public void Put(int index, string id, int count = 1)
+    {
+        slots[index] = id == null ? null : new Slot { id = id, count = count };
         Save();
     }
 

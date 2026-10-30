@@ -51,7 +51,10 @@ public class ThorvayneWoodcutting : MonoBehaviour
     ThorvayneSkills skills;
     ThorvayneInventory inventory;
     ThorvayneGameUI ui;
+    ThorvayneEquipment equipment;
     GameObject axe;
+    Renderer axeRenderer;
+    ThorvayneItems.Item choppingAxe;
 
     void Start()
     {
@@ -59,6 +62,8 @@ public class ThorvayneWoodcutting : MonoBehaviour
         skills = GetComponent<ThorvayneSkills>();
         inventory = GetComponent<ThorvayneInventory>();
         ui = GetComponent<ThorvayneGameUI>();
+        equipment = GetComponent<ThorvayneEquipment>();
+        if (equipment != null) equipment.Changed += UpdateAxe;
         foreach (var t in Terrain.activeTerrains)
         {
             var td = t.terrainData;
@@ -75,8 +80,11 @@ public class ThorvayneWoodcutting : MonoBehaviour
             }
             if (any && tt.original.Length > 0) terrains.Add(tt);
         }
-        BuildAxe();
+        FindAxe();
+        UpdateAxe();
     }
+
+    void OnDestroy() { if (equipment != null) equipment.Changed -= UpdateAxe; }
 
     void OnDisable()
     {
@@ -93,6 +101,11 @@ public class ThorvayneWoodcutting : MonoBehaviour
     void Update()
     {
         if (player == null || skills == null || inventory == null) return;
+        if (equipment == null && (equipment = GetComponent<ThorvayneEquipment>()) != null)   // added later by ThorvaynePlayer
+        {
+            equipment.Changed += UpdateAxe;
+            UpdateAxe();
+        }
         scanTimer -= Time.deltaTime;
         if (scanTimer <= 0) { scanTimer = 0.15f; near = FindNearest(); }
 
@@ -133,25 +146,32 @@ public class ThorvayneWoodcutting : MonoBehaviour
             Say($"You need a Woodcutting level of {t.type.level} to chop down this {t.type.displayName.ToLower()}.");
             return;
         }
+        var best = BestAxe(out bool tooLow);
+        if (best == null)
+        {
+            Say(tooLow ? "You don't have the Woodcutting level to use your axe." : "You need an axe to chop down this tree.");
+            return;
+        }
         if (!inventory.CanAdd(t.type.logId)) { Say("Your inventory is too full to hold any more logs."); return; }
-        chopping = t;
+        chopping = t; choppingAxe = best;
         swingClock = 0; struck = false;
-        if (axe != null) axe.SetActive(true);
+        UpdateAxe();
         Say("You swing your axe at the tree.");
     }
 
     void Stop()
     {
-        chopping = null;
-        if (axe != null) axe.SetActive(false);
+        chopping = null; choppingAxe = null;
+        UpdateAxe();
     }
 
     void Strike()
     {
         var t = chopping;
         int level = skills.Level("Woodcutting");
-        // 35% per swing at the tree's level, rising with your level
-        float chance = Mathf.Clamp(0.35f + (level - t.type.level) * 0.012f, 0.35f, 0.95f);
+        // 35% per swing at the tree's level with a bronze axe, rising with your level and a better axe
+        int power = choppingAxe != null ? choppingAxe.power : 1;
+        float chance = Mathf.Clamp(0.35f + (level - t.type.level) * 0.012f + (power - 1) * 0.04f, 0.35f, 0.95f);
         if (UnityEngine.Random.value > chance) return;
 
         inventory.Add(t.type.logId);
@@ -223,9 +243,10 @@ public class ThorvayneWoodcutting : MonoBehaviour
             }
             tree.transform.rotation = Quaternion.AngleAxis(88f, axis) * start;
             yield return new WaitForSeconds(1.5f);
+            float depth = 6f * Mathf.Max(inst.widthScale, inst.heightScale);   // deeper than the fallen crown is wide
             for (float time = 0; time < 1.5f; time += Time.deltaTime)
             {
-                tree.transform.position += Vector3.down * 2f * Time.deltaTime;   // sink into the ground
+                tree.transform.position += Vector3.down * (depth / 1.5f) * Time.deltaTime;   // sink into the ground
                 yield return null;
             }
             Destroy(tree);
@@ -259,59 +280,53 @@ public class ThorvayneWoodcutting : MonoBehaviour
     }
 
     // ---------------- the axe ----------------
-    // A simple axe made of two boxes, held in the right hand while chopping.
-    // Its direction is worked out from the hand in the model's rest pose (palm down, fingers along the arm),
-    // so it fits any humanoid character without hand-tuning.
-    void BuildAxe()
+    // The hero model has an "Axe" object in its right hand (Extras/add_axe.py). It shows while an axe is
+    // wielded or while chopping with one from the inventory, with the head coloured by the axe's metal.
+    void FindAxe()
     {
         var anim = GetComponentInChildren<Animator>();
-        if (anim == null || !anim.isHuman) return;
-        Transform hand = anim.GetBoneTransform(HumanBodyBones.RightHand);
-        Transform upper = anim.GetBoneTransform(HumanBodyBones.RightUpperArm);
-        Transform finger = anim.GetBoneTransform(HumanBodyBones.RightIndexProximal);
-        if (finger == null) finger = anim.GetBoneTransform(HumanBodyBones.RightMiddleProximal);
-        if (hand == null || upper == null) return;
-
-        Vector3 up = transform.up, fwd = transform.forward;
-        Vector3 arm = (hand.position - upper.position).normalized;
-        Vector3 palm = -(up - arm * Vector3.Dot(up, arm)).normalized;
-        Vector3 fingers = finger != null ? finger.position - hand.position : arm * 0.1f;
-        float len = fingers.magnitude;
-        fingers = (fingers - palm * Vector3.Dot(fingers, palm)).normalized;
-        Vector3 handle = Vector3.Cross(fingers, palm).normalized;
-        if (Vector3.Dot(handle, fwd) < 0) handle = -handle;           // the head sits on the thumb side
-        Vector3 edge = (fingers - handle * Vector3.Dot(fingers, handle)).normalized;
-
-        axe = new GameObject("Axe");
-        axe.transform.SetPositionAndRotation(hand.position + fingers * len * 0.6f + palm * 0.025f, Quaternion.LookRotation(edge, handle));
-        axe.transform.SetParent(hand, true);
-        var skin = GetComponentInChildren<Renderer>();
-        var shaft = Part(axe.transform, new Vector3(0, 0.23f, 0), new Vector3(0.035f, 0.7f, 0.035f), skin, new Color(0.45f, 0.3f, 0.15f));
-        var head = Part(axe.transform, new Vector3(0, 0.5f, 0.07f), new Vector3(0.035f, 0.16f, 0.22f), skin, new Color(0.62f, 0.63f, 0.66f));
-        shaft.name = "Handle"; head.name = "Head";
-        axe.SetActive(false);
+        var t = anim != null ? FindDeep(anim.transform, "Axe") : null;
+        if (t == null) return;
+        axe = t.gameObject;
+        axeRenderer = axe.GetComponent<Renderer>();
     }
 
-    static GameObject Part(Transform parent, Vector3 localPos, Vector3 size, Renderer like, Color color)
+    void UpdateAxe()
     {
-        var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        Destroy(go.GetComponent<Collider>());
-        go.transform.SetParent(parent, false);
-        go.transform.localPosition = localPos;
-        go.transform.localRotation = Quaternion.identity;
-        // undo any scale on the hand bones so the axe keeps its real size
-        Vector3 s = parent.lossyScale;
-        go.transform.localScale = new Vector3(size.x / s.x, size.y / s.y, size.z / s.z);
-        go.transform.localPosition = new Vector3(localPos.x / s.x, localPos.y / s.y, localPos.z / s.z);
-        if (like != null && like.sharedMaterial != null)
+        if (axe == null) return;
+        var it = chopping != null ? choppingAxe : ThorvayneItems.Get(equipment != null ? equipment.Get("Weapon") : null);
+        bool show = ThorvayneItems.IsAxe(it);
+        axe.SetActive(show);
+        if (show && axeRenderer != null && axeRenderer.sharedMaterials.Length > 1)
         {
-            var mat = new Material(like.sharedMaterial);
-            foreach (var prop in new[] { "_BaseMap", "_MainTex", "_BaseColorMap" })   // plain colour, not the character's skin
-                if (mat.HasProperty(prop)) mat.SetTexture(prop, null);
-            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
-            if (mat.HasProperty("_Color")) mat.SetColor("_Color", color);
-            go.GetComponent<Renderer>().sharedMaterial = mat;
+            var mats = axeRenderer.materials;   // per-character copies, so the shared material stays as is
+            if (mats[1].HasProperty("_BaseColor")) mats[1].SetColor("_BaseColor", it.color);
+            if (mats[1].HasProperty("_Color")) mats[1].SetColor("_Color", it.color);
         }
-        return go;
+    }
+
+    // the best axe you can use, wielded or in the inventory (null if none)
+    ThorvayneItems.Item BestAxe(out bool tooLow)
+    {
+        ThorvayneItems.Item best = null; tooLow = false;
+        var ids = new List<string>();
+        if (equipment != null && equipment.Get("Weapon") != null) ids.Add(equipment.Get("Weapon"));
+        foreach (var s in inventory.slots) if (s != null) ids.Add(s.id);
+        int level = skills.Level("Woodcutting");
+        foreach (var id in ids)
+        {
+            var it = ThorvayneItems.Get(id);
+            if (!ThorvayneItems.IsAxe(it)) continue;
+            if (it.level > level) { tooLow = true; continue; }
+            if (best == null || it.power > best.power) best = it;
+        }
+        return best;
+    }
+
+    static Transform FindDeep(Transform t, string name)
+    {
+        if (t.name == name) return t;
+        foreach (Transform c in t) { var r = FindDeep(c, name); if (r != null) return r; }
+        return null;
     }
 }
