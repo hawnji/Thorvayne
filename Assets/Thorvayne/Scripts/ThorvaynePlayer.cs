@@ -9,6 +9,7 @@ using UnityEngine.InputSystem.Controls;
 // WASD move, mouse look, Shift sprint, Space jump, mouse wheel zoom,
 // F fly mode (Space up / Ctrl down), T teleport to the next town or cave, R back to spawn,
 // Esc frees the mouse (click to grab it again).
+// E chop trees, I / Tab inventory, K skills (ThorvayneWoodcutting, ThorvayneGameUI).
 // Works with both the new Input System and the old Input Manager.
 [RequireComponent(typeof(CharacterController))]
 public class ThorvaynePlayer : MonoBehaviour
@@ -42,6 +43,9 @@ public class ThorvaynePlayer : MonoBehaviour
     public bool IsGrounded => cc != null && cc.isGrounded;
     public float GroundSpeed { get; private set; }      // horizontal speed in m/s
     public float VerticalSpeed => vy;
+    public bool HasMoveInput { get; private set; }
+    // true while the inventory or skills panel is open: the mouse is free and the camera stays still
+    public bool MenuOpen { get; private set; }
     Vector3 spawnPos;
     readonly List<WorldMarker> markers = new List<WorldMarker>();
     int teleportIndex = -1;
@@ -59,6 +63,19 @@ public class ThorvaynePlayer : MonoBehaviour
         yaw = transform.eulerAngles.y;
         CollectMarkers();
         SetCursor(true);
+        // gameplay parts (also added here so test players from older versions get them)
+        if (GetComponent<ThorvayneSkills>() == null) gameObject.AddComponent<ThorvayneSkills>();
+        if (GetComponent<ThorvayneInventory>() == null) gameObject.AddComponent<ThorvayneInventory>();
+        if (GetComponent<ThorvayneGameUI>() == null) gameObject.AddComponent<ThorvayneGameUI>();
+        if (GetComponent<ThorvayneWoodcutting>() == null) gameObject.AddComponent<ThorvayneWoodcutting>();
+    }
+
+    public void SetMenuOpen(bool open, bool grabMouse)
+    {
+        if (open == MenuOpen) return;
+        MenuOpen = open;
+        if (open) SetCursor(false);
+        else if (grabMouse) SetCursor(true);
     }
 
     void CollectMarkers()
@@ -85,8 +102,11 @@ public class ThorvaynePlayer : MonoBehaviour
 
     void Update()
     {
-        if (Down(Act.Escape)) SetCursor(false);
-        if (!cursorLocked && MouseClicked()) SetCursor(true);
+        if (!MenuOpen)
+        {
+            if (Down(Act.Escape)) SetCursor(false);
+            if (!cursorLocked && MouseClicked()) SetCursor(true);
+        }
 
         if (cursorLocked)
         {
@@ -101,6 +121,7 @@ public class ThorvaynePlayer : MonoBehaviour
         if (Down(Act.Respawn)) { Teleport(spawnPos); Flash("Back to spawn"); }
 
         Vector2 mv = MoveInput();
+        HasMoveInput = mv.sqrMagnitude > 0.01f || Down(Act.Jump);
         var camFwd = Quaternion.Euler(0, yaw, 0) * Vector3.forward;
         var camRight = Quaternion.Euler(0, yaw, 0) * Vector3.right;
         Vector3 dir = camFwd * mv.y + camRight * mv.x;
@@ -209,9 +230,9 @@ public class ThorvaynePlayer : MonoBehaviour
         var p = transform.position;
         string mode = flying ? "FLYING" : swimming ? "swimming" : "walking";
         string text = $"{nearestText}\nPosition {p.x:0}, {p.z:0}   height {p.y:0} m   {mode}\n" +
-                      "WASD move · Shift sprint · Space jump · wheel zoom\nF fly · T next town/cave · R spawn · Esc free mouse";
-        GUI.Box(new Rect(10, 10, 430, 76), "");
-        GUI.Label(new Rect(18, 14, 420, 72), text);
+                      "WASD move · Shift sprint · Space jump · wheel zoom\nF fly · T next town/cave · R spawn · Esc free mouse\nE chop tree · I inventory · K skills";
+        GUI.Box(new Rect(10, 10, 430, 94), "");
+        GUI.Label(new Rect(18, 14, 420, 90), text);
         if (eventTimer > 0)
         {
             var style = new GUIStyle(GUI.skin.label) { fontSize = 20, alignment = TextAnchor.MiddleCenter };

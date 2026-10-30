@@ -29,7 +29,7 @@ and the old Input Manager, so no setup is needed.
 
 ## Animated character
 `Characters/ThorvayneHero.fbx` is your Mixamo-rigged character, lightened from 700k to 40k triangles so it runs
-well in game. It has six looping animations: **Idle, Walk, Run, Jump, Swim, Fly**. **Run** is your Mixamo running
+well in game. It has seven looping animations: **Idle, Walk, Run, Jump, Swim, Fly, Chop**. **Run** is your Mixamo running
 animation (made to run in place); the others were made to match it. The Test Player uses this character
 automatically, and the animations follow the controls (walk or run by speed, Jump in the air, Swim in the sea, Fly in fly mode).
 - Already have a Test Player? Run **Thorvayne > Add Test Player** again to swap in the character.
@@ -41,6 +41,28 @@ automatically, and the animations follow the controls (walk or run by speed, Jum
 - Animation speed matching is in the `ThorvayneCharacterAnimator` component on the Test Player.
 - The Blender source (`Extras/ThorvayneHero_source.blend` in the zip, outside the Thorvayne folder) has the rig and
   animations. Keep it out of `Assets` unless Blender is installed.
+
+## Woodcutting, inventory and skills
+Walk up to a tree and press **E**. The character swings an axe; each swing can give a log and Woodcutting XP.
+When a tree runs out of logs it falls, leaves a stump, and grows back after a while. Moving or pressing E again stops.
+
+| Tree | Where | Woodcutting level | XP per log | Log |
+|---|---|---|---|---|
+| Tree (broadleaf) | middle of the map | 1 | 25 | Logs (tree always falls after one) |
+| Pine tree | north and hills | 15 | 37.5 | Pine logs |
+| Palm tree | southern beaches | 30 | 67.5 | Palm logs |
+| Swamp tree | low wet spots | 45 | 100 | Swampwood logs |
+| Frost pine | snowy north | 60 | 175 | Frost pine logs |
+
+Shrubs can't be chopped. XP and levels work like RuneScape (level 2 at 83 XP, 99 at 13 million).
+- **I** (or **Tab**) opens the 28-slot inventory, **K** the skills list. The mouse is free while a panel is open.
+  Click an item to drop it, Shift-click to drop all of that kind.
+- Messages appear bottom left, XP drops on the right.
+- Levels and inventory are kept between plays. **Thorvayne > Reset Test Player Progress** starts over.
+- To reach the higher trees quickly while testing, select **Test Player** and raise **Xp Multiplier** on
+  **Thorvayne Woodcutting** (e.g. 20). The tree list (levels, XP, regrow times) is on the same component.
+- Already have a Test Player? Run **Thorvayne > Add Test Player** again so the character gets the Chop animation.
+- Felled trees are put back when you stop Play, so the world isn't changed.
 
 ## What you get
 - **Terrain**: 25 tiles of 1 x 1 km, heights up to 600 m, sea level at 40 m. The sea floor drops
@@ -83,5 +105,8 @@ always renders correctly in URP.
 - `Scripts/ThorvaynePlayer.cs`: the test character's movement, camera and on-screen info.
 - `Scripts/ThorvayneCharacterAnimator.cs`: picks the character animation to play.
 - `Characters/ThorvayneHero.fbx`: the rigged, animated character (Mixamo skeleton, Humanoid).
+- `Scripts/ThorvayneWoodcutting.cs`: chopping trees, the axe, falling trees, stumps and regrowing.
+- `Scripts/ThorvayneSkills.cs` / `ThorvayneInventory.cs`: skill XP and levels, the 28-slot inventory and the item list.
+- `Scripts/ThorvayneGameUI.cs`: messages, XP drops, inventory and skills panels.
 - `Scripts/WorldMarker.cs`: tag on towns, cities and caves (shared with the map-based world).
 - `MapData/Textures/`: simple ground textures (swap in real ones any time; keep the file names).
