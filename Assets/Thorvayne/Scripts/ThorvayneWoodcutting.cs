@@ -54,6 +54,8 @@ public class ThorvayneWoodcutting : MonoBehaviour
     ThorvayneEquipment equipment;
     GameObject axe;
     Renderer axeRenderer;
+    Animator axeAnimator;
+    int gripLayer = -1;
     ThorvayneItems.Item choppingAxe;
 
     void Start()
@@ -281,7 +283,8 @@ public class ThorvayneWoodcutting : MonoBehaviour
 
     // ---------------- the axe ----------------
     // The hero model has an "Axe" object in its right hand (Extras/add_axe.py). It shows while an axe is
-    // wielded or while chopping with one from the inventory, with the head coloured by the axe's metal.
+    // wielded or while chopping with one from the inventory, with the head coloured by the axe's metal
+    // and the hand closed around the handle.
     void FindAxe()
     {
         var anim = GetComponentInChildren<Animator>();
@@ -289,6 +292,8 @@ public class ThorvayneWoodcutting : MonoBehaviour
         if (t == null) return;
         axe = t.gameObject;
         axeRenderer = axe.GetComponent<Renderer>();
+        axeAnimator = anim;
+        gripLayer = anim.GetLayerIndex("Grip");   // closes the right hand (ThorvayneTestPlayerSetup)
     }
 
     void UpdateAxe()
@@ -297,6 +302,7 @@ public class ThorvayneWoodcutting : MonoBehaviour
         var it = chopping != null ? choppingAxe : ThorvayneItems.Get(equipment != null ? equipment.Get("Weapon") : null);
         bool show = ThorvayneItems.IsAxe(it);
         axe.SetActive(show);
+        if (gripLayer >= 0) axeAnimator.SetLayerWeight(gripLayer, show ? 1f : 0f);
         if (show && axeRenderer != null && axeRenderer.sharedMaterials.Length > 1)
         {
             var mats = axeRenderer.materials;   // per-character copies, so the shared material stays as is
