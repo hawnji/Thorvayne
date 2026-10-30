@@ -7,9 +7,9 @@ public class ThorvayneCharacterAnimator : MonoBehaviour
     public ThorvaynePlayer player;
     public Animator animator;
     public ThorvayneWoodcutting woodcutting;
-    public float walkAnimSpeed = 4f;     // ground speed (m/s) at which the walk clip plays at normal speed
-    public float runAnimSpeed = 9f;      // same for the run clip
-    public float runThreshold = 7.5f;    // faster than this = run
+    public float walkAnimSpeed = 1.5f;   // ground speed (m/s) at which the walk clip plays at normal speed
+    public float runAnimSpeed = 5f;      // same for the run clip
+    public float runThreshold = 3.5f;    // faster than this = run (walking is 1.6 m/s, running 6)
     public float fadeTime = 0.18f;
     [Tooltip("Nudges the model up (+) or down (-) in metres if its feet don't quite touch the ground.")]
     public float footOffset = 0f;
@@ -39,7 +39,7 @@ public class ThorvayneCharacterAnimator : MonoBehaviour
         else if (player.IsFlying) state = "Fly";
         else if (player.IsSwimming) { state = "Swim"; playSpeed = speed > 0.5f ? 1.3f : 0.8f; }
         else if (airTime > 0.15f) state = "Jump";
-        else if (speed > runThreshold) { state = "Run"; playSpeed = Mathf.Clamp(speed / runAnimSpeed, 0.8f, 1.6f); }
+        else if (speed > runThreshold) { state = "Run"; playSpeed = Mathf.Clamp(speed / runAnimSpeed, 0.6f, 1.8f); }
         else if (speed > 0.3f) { state = "Walk"; playSpeed = Mathf.Clamp(speed / walkAnimSpeed, 0.6f, 1.8f); }
         else state = "Idle";
 

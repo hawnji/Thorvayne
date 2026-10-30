@@ -181,8 +181,10 @@ namespace Thorvayne.WorldGen.EditorTools
             }
             if (!importer.importAnimation) { importer.importAnimation = true; changed = true; }
             var clips = importer.clipAnimations;
-            // also redo it when the FBX gained clips (e.g. Chop) since the clip list was last set
-            if (changed || clips == null || clips.Length == 0 || clips.Length != importer.defaultClipAnimations.Length
+            // redo it when the FBX gained clips (e.g. Chop) or a clip changed length (e.g. a new Mixamo Idle)
+            var defaults = importer.defaultClipAnimations;
+            bool lengthsChanged = clips != null && clips.Any(c => !defaults.Any(d => d.takeName == c.takeName && d.lastFrame == c.lastFrame));
+            if (changed || clips == null || clips.Length == 0 || clips.Length != defaults.Length || lengthsChanged
                 || clips.Any(c => !c.loopTime || !c.heightFromFeet || c.name.Contains("|")))
             {
                 clips = importer.defaultClipAnimations;

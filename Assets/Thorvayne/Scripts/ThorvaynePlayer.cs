@@ -1,12 +1,13 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
 #endif
 
 // Simple third-person test character for walking around the generated worlds.
-// WASD move, mouse look, Shift sprint, Space jump, mouse wheel zoom,
+// WASD move, mouse look, Shift sprint, X walk/run, Space jump, mouse wheel zoom,
 // F fly mode (Space up / Ctrl down), T teleport to the next town or cave, R back to spawn,
 // Esc frees the mouse (click to grab it again).
 // E chop trees, I / Tab inventory, G equipment, K skills (ThorvayneWoodcutting, ThorvayneGameUI).
@@ -15,7 +16,9 @@ using UnityEngine.InputSystem.Controls;
 public class ThorvaynePlayer : MonoBehaviour
 {
     [Header("Movement")]
-    public float walkSpeed = 6f;
+    [FormerlySerializedAs("walkSpeed")]
+    public float runSpeed = 6f;            // normal pace
+    public float walkingSpeed = 1.6f;      // X switches between running and walking, like RuneScape's run toggle
     public float sprintSpeed = 12f;
     public float flySpeed = 70f;
     public float jumpHeight = 1.4f;
@@ -52,7 +55,8 @@ public class ThorvaynePlayer : MonoBehaviour
     string nearestText = "", eventText = "";
     float nearestTimer, eventTimer;
 
-    enum Act { Sprint, Jump, Down, Fly, Teleport, Respawn, Escape }
+    enum Act { Sprint, Jump, Down, Fly, Teleport, Respawn, WalkToggle, Escape }
+    bool walking;
 
     void Start()
     {
@@ -117,6 +121,7 @@ public class ThorvaynePlayer : MonoBehaviour
         }
         cameraDistance = Mathf.Clamp(cameraDistance - Scroll() * cameraDistance * 0.15f, minDistance, maxDistance);
 
+        if (Down(Act.WalkToggle)) { walking = !walking; Flash(walking ? "Walking (X to run)" : "Running (X to walk)"); }
         if (Down(Act.Fly)) { flying = !flying; vy = 0; Flash(flying ? "Fly mode ON (Space up, Ctrl down)" : "Fly mode OFF"); }
         if (Down(Act.Teleport)) TeleportNext();
         if (Down(Act.Respawn)) { Teleport(spawnPos); Flash("Back to spawn"); }
@@ -139,7 +144,7 @@ public class ThorvaynePlayer : MonoBehaviour
         }
         else
         {
-            float speed = Held(Act.Sprint) ? sprintSpeed : walkSpeed;
+            float speed = Held(Act.Sprint) ? sprintSpeed : walking ? walkingSpeed : runSpeed;
             if (swimming)
             {
                 speed *= 0.55f;
@@ -229,9 +234,9 @@ public class ThorvaynePlayer : MonoBehaviour
     void OnGUI()
     {
         var p = transform.position;
-        string mode = flying ? "FLYING" : swimming ? "swimming" : "walking";
+        string mode = flying ? "FLYING" : swimming ? "swimming" : walking ? "walking" : "running";
         string text = $"{nearestText}\nPosition {p.x:0}, {p.z:0}   height {p.y:0} m   {mode}\n" +
-                      "WASD move · Shift sprint · Space jump · wheel zoom\nF fly · T next town/cave · R spawn · Esc free mouse\nE chop tree · I inventory · G equipment · K skills";
+                      "WASD move · X walk/run · Shift sprint · Space jump · wheel zoom\nF fly · T next town/cave · R spawn · Esc free mouse\nE chop tree · I inventory · G equipment · K skills";
         GUI.Box(new Rect(10, 10, 430, 94), "");
         GUI.Label(new Rect(18, 14, 420, 90), text);
         if (eventTimer > 0)
@@ -263,6 +268,7 @@ public class ThorvaynePlayer : MonoBehaviour
             case Act.Fly: return kb.fKey;
             case Act.Teleport: return kb.tKey;
             case Act.Respawn: return kb.rKey;
+            case Act.WalkToggle: return kb.xKey;
             default: return kb.escapeKey;
         }
     }
@@ -288,6 +294,7 @@ public class ThorvaynePlayer : MonoBehaviour
             case Act.Fly: return KeyCode.F;
             case Act.Teleport: return KeyCode.T;
             case Act.Respawn: return KeyCode.R;
+            case Act.WalkToggle: return KeyCode.X;
             default: return KeyCode.Escape;
         }
     }

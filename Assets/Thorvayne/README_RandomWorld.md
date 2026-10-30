@@ -18,7 +18,8 @@ or cave under `Thorvayne Random World` to fly to it.
 
 ## Walk around it (test player)
 Every generated world gets a **Test Player** (a blue capsule) at the starter town. Press **Play**.
-- **WASD** move, **mouse** turns the camera, **Shift** sprint, **Space** jump, **mouse wheel** zoom.
+- **WASD** move, **mouse** turns the camera, **X** switches walk/run (you run by default), **Shift** sprint,
+  **Space** jump, **mouse wheel** zoom.
 - **F** fly mode (Space up, Ctrl down, Shift to fly faster): handy for crossing 5 km quickly.
 - **T** teleports to the next town, city or cave. **R** goes back to the spawn point.
 - **Esc** frees the mouse; click in the Game view to grab it again.
@@ -32,6 +33,9 @@ and the old Input Manager, so no setup is needed.
 well in game. It has seven looping animations: **Idle, Walk, Run, Jump, Swim, Fly, Chop**. **Run** is your Mixamo running
 animation (made to run in place); the others were made to match it. The Test Player uses this character
 automatically, and the animations follow the controls (walk or run by speed, Jump in the air, Swim in the sea, Fly in fly mode).
+- **Idle** and **Walk** are your Mixamo animations ("player Idle", "Standard Walk"). To swap in other Mixamo
+  animations, download them "In Place" and run `Extras/import_mixamo_anim.py` (Blender), e.g.
+  `Run=run.fbx`; it copies them onto the character and puts the feet on the ground.
 - Already have a Test Player? Run **Thorvayne > Add Test Player** again to swap in the character.
 - The rig is set to **Humanoid**, so free humanoid animations from the Unity Asset Store or Mixamo also work on it.
   To use one, drag the clip onto the matching state
