@@ -37,7 +37,9 @@ automatically, and the animations follow the controls (walk or run by speed, Jum
   To use one, drag the clip onto the matching state
   (Idle, Walk, Run...) in `Assets/Thorvayne/Characters/ThorvayneHero.controller` (Motion field).
   Note: Add Test Player rebuilds that controller, so redo the drag afterwards.
-- Colour: change the material `Assets/Thorvayne/Generated/Mat_HeroSkin` (the Mixamo file came without a texture).
+- Skin: `Characters/ThorvayneHero_Skin.png` is the character's colour texture (from your ComfyUI model, projected onto
+  the rigged character with `Extras/bake_skin.py`). Add Test Player puts it on the material `Generated/Mat_HeroSkin`.
+  To repaint, edit the PNG in any paint program, or replace it with another file of the same name.
 - Animation speed matching is in the `ThorvayneCharacterAnimator` component on the Test Player.
 - The Blender source (`Extras/ThorvayneHero_source.blend` in the zip, outside the Thorvayne folder) has the rig and
   animations. Keep it out of `Assets` unless Blender is installed.
