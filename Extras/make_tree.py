@@ -10,6 +10,7 @@ src_path, out_dir, name = args[:3]
 HEIGHT = float(args[3]) if len(args) > 3 else 7.0
 TRIS = int(args[4]) if len(args) > 4 else 20000
 TEX = 2048; IMP = 512
+SINK = 0.04          # share of the height that goes below ground
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=src_path)
@@ -25,13 +26,26 @@ bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
 bpy.ops.mesh.remove_doubles(threshold=1e-5)
 bpy.ops.object.mode_set(mode='OBJECT')
 
-# real size, pivot at the bottom of the trunk
-V = tree.data.vertices
-zmin = min(v.co.z for v in V); zmax = max(v.co.z for v in V)
-low = [v.co for v in V if v.co.z < zmin + 0.05 * (zmax - zmin)]
-cx = sum(p.x for p in low) / len(low); cy = sum(p.y for p in low) / len(low)
-k = HEIGHT / (zmax - zmin)
-tree.location = (-cx * k, -cy * k, -zmin * k); tree.scale = (k, k, k)
+# stand the trunk up straight: generated trees often lean, and with each tree turned a different way on the
+# terrain the lean shows as trees tipped in random directions. Fit a line through the middle of the trunk
+# (the box centre of thin slices between 6% and 30% of the height) and shear the tree so that line is vertical.
+import numpy as np
+P = np.array([v.co[:] for v in tree.data.vertices])
+zmin, zmax = P[:, 2].min(), P[:, 2].max(); H = zmax - zmin
+zs, xs, ys = [], [], []
+for f in np.arange(0.06, 0.30, 0.02):
+    sl = P[(P[:, 2] >= zmin + f * H) & (P[:, 2] < zmin + (f + 0.02) * H)]
+    if len(sl) < 3: continue
+    zs.append(sl[:, 2].mean()); xs.append((sl[:, 0].min() + sl[:, 0].max()) / 2); ys.append((sl[:, 1].min() + sl[:, 1].max()) / 2)
+ax, bx = np.polyfit(zs, xs, 1); ay, by = np.polyfit(zs, ys, 1)
+print('trunk lean', round(float(np.degrees(np.arctan(np.hypot(ax, ay)))), 1), 'degrees, straightened')
+for v in tree.data.vertices:
+    v.co.x -= ax * (v.co.z - zmin); v.co.y -= ay * (v.co.z - zmin)
+cx, cy = ax * zmin + bx, ay * zmin + by               # the trunk's centre at the ground: the pivot
+
+# real size, pivot at the bottom of the trunk, sunk a little so root tips that lift off the ground stay in it
+k = HEIGHT / H
+tree.location = (-cx * k, -cy * k, -zmin * k - SINK * HEIGHT); tree.scale = (k, k, k)
 bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 
 hi = tree.copy(); hi.data = tree.data.copy(); sc.collection.objects.link(hi)   # full detail: bake source and far pictures
