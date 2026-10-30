@@ -36,6 +36,34 @@ namespace Thorvayne.WorldGen.EditorTools
                 if (fixedInst) { td.SetTreeInstances(inst, true); EditorUtility.SetDirty(td); }
                 if (changed) { EditorUtility.SetDirty(t); fixedTerrains++; }
             }
+            // what each tree type is drawn with, from the first terrain (all tiles share the same tree types)
+            var td0 = terrains[0].terrainData;
+            var counts = new int[td0.treePrototypes.Length];
+            foreach (var t in terrains)
+                foreach (var ti in t.terrainData.treeInstances)
+                    if (ti.prototypeIndex >= 0 && ti.prototypeIndex < counts.Length) counts[ti.prototypeIndex]++;
+            var report = new System.Text.StringBuilder("Check Trees: tree types\n");
+            for (int p = 0; p < td0.treePrototypes.Length; p++)
+            {
+                var prefab = td0.treePrototypes[p].prefab;
+                report.Append($"  {p} {(prefab != null ? prefab.name : "(none)")}: {counts[p]} trees");
+                if (prefab != null)
+                {
+                    var lod = prefab.GetComponent<LODGroup>();
+                    report.Append(lod != null ? $", LODGroup {lod.lodCount} levels size {lod.size:0.##}" : ", no LODGroup");
+                    foreach (var r in prefab.GetComponentsInChildren<Renderer>(true))
+                    {
+                        var mf = r.GetComponent<MeshFilter>();
+                        var mesh = mf != null ? mf.sharedMesh : null;
+                        var mat = r.sharedMaterial;
+                        report.Append($"\n      {r.name}: mesh {(mesh != null ? $"{mesh.name} {mesh.vertexCount} verts, size {mesh.bounds.size}" : "MISSING")}, " +
+                                      $"pos {r.transform.localPosition} scale {r.transform.localScale}, " +
+                                      $"material {(mat != null ? $"{mat.name} ({mat.shader.name})" : "MISSING")}, enabled {r.enabled}");
+                    }
+                }
+                report.Append("\n");
+            }
+            Debug.Log(report.ToString());
             Debug.Log($"Check Trees: {terrains.Length} terrains, {total} trees. Put back {shrunk} shrunk trees, " +
                       $"switched trees back on for {fixedTerrains} terrains. Tree types with a missing prefab: {noPrefab}" +
                       (total == 0 ? ". There are no trees at all: generate the world again (seed 1234)." : "."));
