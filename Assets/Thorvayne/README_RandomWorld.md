@@ -65,7 +65,8 @@ Shrubs can't be chopped. XP and levels work like RuneScape (level 2 at 83 XP, 99
   with a bronze axe in hand. Axes: Bronze (1), Iron (1), Steel (6), Mithril (21), Adamant (31), Rune (41) Woodcutting;
   better axes chop faster. The axe shows in the character's hand (its head takes the metal's colour). The model is
   your ComfyUI axe, cut down to 3k triangles by `Extras/make_axe.py` and put in the hand by `Extras/add_axe.py`
-  (textures `Characters/ThorvayneAxe_Albedo.png` and `ThorvayneAxe_Metal.png`).
+  (textures `Characters/ThorvayneAxe_Albedo.png` and `ThorvayneAxe_Metal.png`). While the axe is in hand, the right hand
+  closes around it (a "Grip" layer in the animator that only moves the right fingers; clip from `Extras/add_grip.py`).
 - **I** (or **Tab**) opens the 28-slot inventory, **G** the equipment screen, **K** the skills list. The mouse is
   free while a panel is open. In the inventory, click gear to wear or wield it, click other items (or right-click
   anything) to drop, Shift-click to drop all of that kind. In the equipment screen, click an item to take it off.

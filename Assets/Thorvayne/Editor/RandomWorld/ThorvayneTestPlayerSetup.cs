@@ -16,6 +16,7 @@ namespace Thorvayne.WorldGen.EditorTools
         const string PlayerName = "Test Player";
         const string HeroPath = "Assets/Thorvayne/Characters/ThorvayneHero.fbx";
         const string ControllerPath = "Assets/Thorvayne/Characters/ThorvayneHero.controller";
+        const string GripMaskPath = "Assets/Thorvayne/Characters/ThorvayneHero_RightFingers.mask";
         const string SkinPath = "Assets/Thorvayne/Characters/ThorvayneHero_Skin.png";   // optional colour texture
         const string AxeWoodPath = "Assets/Thorvayne/Characters/ThorvayneAxe_Albedo.png";
         const string AxeMetalPath = "Assets/Thorvayne/Characters/ThorvayneAxe_Metal.png";   // light grey, tinted per axe in game
@@ -222,6 +223,27 @@ namespace Thorvayne.WorldGen.EditorTools
                 st.motion = clip;
                 if (name == "Idle") sm.defaultState = st;
             }
+
+            // "Grip" layer: closes the right hand around the axe. It only moves the right fingers, and
+            // ThorvayneWoodcutting turns it on while an axe is in hand (Extras/add_grip.py makes the clip).
+            var grip = clips.FirstOrDefault(c => c.name == "Grip" || c.name.EndsWith("|Grip"));
+            if (grip != null)
+            {
+                AssetDatabase.DeleteAsset(GripMaskPath);
+                var mask = new AvatarMask();
+                for (int i = 0; i < (int)AvatarMaskBodyPart.LastBodyPart; i++)
+                    mask.SetHumanoidBodyPartActive((AvatarMaskBodyPart)i, (AvatarMaskBodyPart)i == AvatarMaskBodyPart.RightFingers);
+                AssetDatabase.CreateAsset(mask, GripMaskPath);
+                ac.AddLayer("Grip");
+                var layers = ac.layers;
+                var gl = layers[layers.Length - 1];
+                gl.avatarMask = mask;
+                gl.defaultWeight = 0f;
+                gl.stateMachine.defaultState = gl.stateMachine.AddState("Grip");
+                gl.stateMachine.defaultState.motion = grip;
+                ac.layers = layers;
+            }
+            else Debug.LogWarning("ThorvayneHero.fbx is missing the Grip clip (the hand stays open around the axe)");
             AssetDatabase.SaveAssets();
             return ac;
         }
