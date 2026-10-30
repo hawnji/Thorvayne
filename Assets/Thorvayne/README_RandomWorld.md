@@ -93,7 +93,7 @@ world built from the hand-drawn map, which lives under its own object.
 
 ## Tree models
 Real tree models replace the placeholders when they are in `Assets/Thorvayne/Trees/`. Right now the
-**broadleaf tree** is your ComfyUI model: `Broadleaf.fbx` holds a 12k-triangle version for up close (`LOD0`) and two
+**broadleaf tree** is your ComfyUI model: `Broadleaf.fbx` holds a 20k-triangle version for up close (`LOD0`) and two
 crossed picture cards for far away (`LOD1`), with `Broadleaf_Albedo.png` and `Broadleaf_Impostor.png`.
 Generate the world again to use it (with the same seed you get the same world, only with the new trees).
 To make another one from a .glb, run `Extras/make_tree.py` (Blender) with the name of the tree it replaces

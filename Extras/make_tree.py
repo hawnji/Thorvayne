@@ -1,14 +1,14 @@
 # Turns a high-poly textured tree (e.g. a ComfyUI .glb) into a game-ready terrain tree:
-#   LOD0  - the tree decimated to ~12k triangles, keeping its own texture (close up)
+#   LOD0  - the tree decimated to ~20k triangles, its colours baked onto a fresh texture (close up)
 #   LOD1  - two crossed cards showing pictures of the tree (far away, 4 triangles)
 # Output: <name>.fbx (objects LOD0 and LOD1), <name>_Albedo.png, <name>_Impostor.png (with alpha).
-# Usage: python make_tree.py -- in.glb out_dir Broadleaf [height_m=7] [tris=12000]
+# Usage: python make_tree.py -- in.glb out_dir Broadleaf [height_m=7] [tris=20000]
 import bpy, sys, math, os
 from mathutils import Vector
 args = sys.argv[sys.argv.index('--')+1:]
 src_path, out_dir, name = args[:3]
 HEIGHT = float(args[3]) if len(args) > 3 else 7.0
-TRIS = int(args[4]) if len(args) > 4 else 12000
+TRIS = int(args[4]) if len(args) > 4 else 20000
 TEX = 2048; IMP = 512
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -20,6 +20,10 @@ for o in list(sc.objects):
 tree.parent = None
 bpy.context.view_layer.objects.active = tree; tree.select_set(True)
 bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+# ComfyUI meshes come split along every texture seam; weld them first, or decimating opens holes along the seams
+bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
+bpy.ops.mesh.remove_doubles(threshold=1e-5)
+bpy.ops.object.mode_set(mode='OBJECT')
 
 # real size, pivot at the bottom of the trunk
 V = tree.data.vertices
@@ -30,19 +34,38 @@ k = HEIGHT / (zmax - zmin)
 tree.location = (-cx * k, -cy * k, -zmin * k); tree.scale = (k, k, k)
 bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 
+hi = tree.copy(); hi.data = tree.data.copy(); sc.collection.objects.link(hi)   # full detail: bake source and far pictures
 mod = tree.modifiers.new('dec', 'DECIMATE'); mod.ratio = TRIS / len(tree.data.polygons)
 bpy.ops.object.modifier_apply(modifier='dec')
 tree.name = tree.data.name = 'LOD0'
 print('LOD0 triangles', sum(len(p.vertices) - 2 for p in tree.data.polygons))
 
-# colour texture: the model's own base colour, resized
-mat = tree.data.materials[0]
-base = [n for n in mat.node_tree.nodes if n.type == 'TEX_IMAGE' and any(l.to_socket.name == 'Base Color' for l in n.outputs[0].links)][0].image
-alb = base.copy(); alb.scale(TEX, TEX)
+# colour texture: fresh UVs on the reduced tree, colours baked from the full-detail model
+# (reusing the original UVs smears the texture once the mesh is reduced)
+me = tree.data
+while me.uv_layers: me.uv_layers.remove(me.uv_layers[0])
+me.uv_layers.new(name='UVMap')
+bpy.ops.object.select_all(action='DESELECT'); tree.select_set(True); bpy.context.view_layer.objects.active = tree
+bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
+bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.003)
+bpy.ops.object.mode_set(mode='OBJECT')
+alb = bpy.data.images.new(name + '_Albedo', TEX, TEX)
+lmat = bpy.data.materials.new('LOD0'); lmat.use_nodes = True
+lt = lmat.node_tree.nodes.new('ShaderNodeTexImage'); lt.image = alb; lmat.node_tree.nodes.active = lt
+me.materials.clear(); me.materials.append(lmat)
+sc.render.engine = 'CYCLES'; sc.cycles.samples = 1
+bk = sc.render.bake
+bk.use_selected_to_active = True; bk.cage_extrusion = 0.02; bk.max_ray_distance = 0.08; bk.margin = 8
+bk.use_pass_direct = False; bk.use_pass_indirect = False; bk.use_pass_color = True
+hi.select_set(True); tree.select_set(True); bpy.context.view_layer.objects.active = tree
+bpy.ops.object.bake(type='DIFFUSE', pass_filter={'COLOR'})
 alb.filepath_raw = os.path.join(out_dir, name + '_Albedo.png'); alb.file_format = 'PNG'; alb.save()
 
-# impostor pictures: flat colour (no lighting), front and side, transparent background
-V = tree.data.vertices
+# impostor pictures of the full-detail model: flat colour (no lighting), front and side, transparent background
+tree.hide_render = True
+mat = hi.data.materials[0]
+base = [n for n in mat.node_tree.nodes if n.type == 'TEX_IMAGE' and any(l.to_socket.name == 'Base Color' for l in n.outputs[0].links)][0].image
+V = hi.data.vertices
 S = 1.02 * max(HEIGHT, 2 * max(abs(v.co.x) for v in V), 2 * max(abs(v.co.y) for v in V))
 nt = mat.node_tree
 for l in list(nt.links):
@@ -81,6 +104,7 @@ uvs = [(0, 0), (0.5, 0), (0.5, 1), (0, 1), (0.5, 0), (1, 0), (1, 1), (0.5, 1)]
 for loop in me.loops: uv.data[loop.index].uv = uvs[loop.vertex_index]
 lod1 = bpy.data.objects.new('LOD1', me); sc.collection.objects.link(lod1)
 
+tree.hide_render = False; bpy.data.objects.remove(hi)
 bpy.ops.object.select_all(action='DESELECT'); tree.select_set(True); lod1.select_set(True)
 bpy.ops.export_scene.fbx(filepath=os.path.join(out_dir, name + '.fbx'), use_selection=True, object_types={'MESH'},
     apply_unit_scale=True, apply_scale_options='FBX_SCALE_ALL', axis_forward='-Z', axis_up='Y',
