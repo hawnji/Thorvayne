@@ -57,13 +57,20 @@ When a tree runs out of logs it falls, leaves a stump, and grows back after a wh
 | Frost pine | snowy north | 60 | 175 | Frost pine logs |
 
 Shrubs can't be chopped. XP and levels work like RuneScape (level 2 at 83 XP, 99 at 13 million).
-- **I** (or **Tab**) opens the 28-slot inventory, **K** the skills list. The mouse is free while a panel is open.
-  Click an item to drop it, Shift-click to drop all of that kind.
+- You need an axe, wielded or in the inventory; the best one you have the level for is used. New characters start
+  with a bronze axe in hand. Axes: Bronze (1), Iron (1), Steel (6), Mithril (21), Adamant (31), Rune (41) Woodcutting;
+  better axes chop faster. The axe shows in the character's hand (its head takes the metal's colour).
+- **I** (or **Tab**) opens the 28-slot inventory, **G** the equipment screen, **K** the skills list. The mouse is
+  free while a panel is open. In the inventory, click gear to wear or wield it, click other items (or right-click
+  anything) to drop, Shift-click to drop all of that kind. In the equipment screen, click an item to take it off.
+- Equipment slots: Head, Cape, Neck, Ammo, Weapon, Body, Shield, Legs, Hands, Feet, Ring. Only axes exist so far;
+  new gear is one line in `ThorvayneItems` (in `Scripts/ThorvayneInventory.cs`).
 - Messages appear bottom left, XP drops on the right.
 - Levels and inventory are kept between plays. **Thorvayne > Reset Test Player Progress** starts over.
 - To reach the higher trees quickly while testing, select **Test Player** and raise **Xp Multiplier** on
   **Thorvayne Woodcutting** (e.g. 20). The tree list (levels, XP, regrow times) is on the same component.
-- Already have a Test Player? Run **Thorvayne > Add Test Player** again so the character gets the Chop animation.
+- Already have a Test Player? Run **Thorvayne > Add Test Player** again so the character gets the Chop animation
+  and the axe.
 - Felled trees are put back when you stop Play, so the world isn't changed.
 
 ## What you get
@@ -116,7 +123,8 @@ always renders correctly in URP.
 - `Scripts/ThorvayneCharacterAnimator.cs`: picks the character animation to play.
 - `Characters/ThorvayneHero.fbx`: the rigged, animated character (Mixamo skeleton, Humanoid).
 - `Scripts/ThorvayneWoodcutting.cs`: chopping trees, the axe, falling trees, stumps and regrowing.
-- `Scripts/ThorvayneSkills.cs` / `ThorvayneInventory.cs`: skill XP and levels, the 28-slot inventory and the item list.
+- `Scripts/ThorvayneSkills.cs` / `ThorvayneInventory.cs` / `ThorvayneEquipment.cs`: skill XP and levels, the 28-slot
+  inventory and the item list, and the equipment slots.
 - `Scripts/ThorvayneGameUI.cs`: messages, XP drops, inventory and skills panels.
 - `Scripts/WorldMarker.cs`: tag on towns, cities and caves (shared with the map-based world).
 - `MapData/Textures/`: simple ground textures (swap in real ones any time; keep the file names).

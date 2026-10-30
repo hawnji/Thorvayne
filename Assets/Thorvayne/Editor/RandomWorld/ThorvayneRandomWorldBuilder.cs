@@ -542,13 +542,24 @@ namespace Thorvayne.WorldGen.EditorTools
             // make it the intended height whatever unit scale the FBX came in with
             var r0 = lod0.GetComponent<MeshRenderer>();
             float h = r0.bounds.size.y;
-            if (h > 0.01f) go.transform.localScale *= height / h;
-            if (Mathf.Abs(go.transform.localScale.x - 1f) > 0.01f)
+            float k = h > 0.01f ? height / h : 1f;
+            // Bake each part's position, rotation (FBX files often carry a -90 degree turn) and that scale into its
+            // mesh, so every part sits at identity under the root. Terrain trees don't reliably keep child transforms:
+            // trees redrawn after being changed at runtime (felled and regrown) came back lying on their side.
+            foreach (Transform c in go.transform)
             {
-                // terrain trees ignore the prefab's own scale, so bake it into the children
-                float k = go.transform.localScale.x;
-                go.transform.localScale = Vector3.one;
-                foreach (Transform c in go.transform) { c.localScale *= k; c.localPosition *= k; }
+                var mf = c.GetComponent<MeshFilter>();
+                if (mf == null || mf.sharedMesh == null) continue;
+                var m = Matrix4x4.Scale(Vector3.one * k) * go.transform.worldToLocalMatrix * c.localToWorldMatrix;
+                var mesh = UnityEngine.Object.Instantiate(mf.sharedMesh);
+                var v = mesh.vertices; var n = mesh.normals;
+                for (int i = 0; i < v.Length; i++) v[i] = m.MultiplyPoint3x4(v[i]);
+                for (int i = 0; i < n.Length; i++) n[i] = m.MultiplyVector(n[i]).normalized;
+                mesh.vertices = v; if (n.Length == v.Length) mesh.normals = n;
+                mesh.RecalculateBounds();
+                ReplaceAsset(mesh, $"{GenDir}/Mesh_Tree{name}_{c.name}.asset");
+                mf.sharedMesh = mesh;
+                c.localPosition = Vector3.zero; c.localRotation = Quaternion.identity; c.localScale = Vector3.one;
             }
 
             var albedo = AssetDatabase.LoadAssetAtPath<Texture2D>($"{TreeModelDir}/{name}_Albedo.png");

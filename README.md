@@ -33,4 +33,4 @@ project, install **Universal RP** from Window > Package Manager > Unity Registry
 
 ## Controls (Test Player)
 WASD move · mouse look · Shift sprint · Space jump · wheel zoom · F fly · T next town/cave · R spawn · Esc free mouse.
-E chop tree · I or Tab inventory · K skills.
+E chop tree · I or Tab inventory · G equipment · K skills.
