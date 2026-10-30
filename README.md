@@ -32,5 +32,5 @@ project, install **Universal RP** from Window > Package Manager > Unity Registry
 - `Tools/WorldPreview/` — offline preview renderer for the generator (mono + Python), used for the map images.
 
 ## Controls (Test Player)
-WASD move · mouse look · Shift sprint · Space jump · wheel zoom · F fly · T next town/cave · R spawn · Esc free mouse.
+WASD move · mouse look · X walk/run · Shift sprint · Space jump · wheel zoom · F fly · T next town/cave · R spawn · Esc free mouse.
 E chop tree · I or Tab inventory · G equipment · K skills.
