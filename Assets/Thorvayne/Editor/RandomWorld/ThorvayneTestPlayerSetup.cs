@@ -106,7 +106,9 @@ namespace Thorvayne.WorldGen.EditorTools
             {
                 body.transform.localScale *= HeroHeight / b.size.y;
                 MeshWorldBounds(rends, out b);
-                body.transform.position += Vector3.up * (player.transform.position.y - b.min.y);
+                // the CharacterController hovers by its skin width, so sink the model by the same amount
+                float skin = player.GetComponent<CharacterController>().skinWidth;
+                body.transform.position += Vector3.up * (player.transform.position.y - b.min.y - skin);
             }
             var mat = PlayerMat("HeroSkin", new Color(0.78f, 0.66f, 0.55f));
             foreach (var r in rends)
@@ -140,7 +142,7 @@ namespace Thorvayne.WorldGen.EditorTools
             }
             if (!importer.importAnimation) { importer.importAnimation = true; changed = true; }
             var clips = importer.clipAnimations;
-            if (changed || clips == null || clips.Length == 0 || clips.Any(c => !c.loopTime || c.name.Contains("|")))
+            if (changed || clips == null || clips.Length == 0 || clips.Any(c => !c.loopTime || !c.heightFromFeet || c.name.Contains("|")))
             {
                 clips = importer.defaultClipAnimations;
                 foreach (var c in clips)
@@ -149,6 +151,7 @@ namespace Thorvayne.WorldGen.EditorTools
                     if (bar >= 0) c.name = c.name.Substring(bar + 1);
                     c.loopTime = true;
                     c.lockRootRotation = c.lockRootHeightY = c.lockRootPositionXZ = true;
+                    c.heightFromFeet = true;   // Root Y based on feet: keeps the soles on the ground
                 }
                 importer.clipAnimations = clips;
                 changed = true;

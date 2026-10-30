@@ -10,6 +10,8 @@ public class ThorvayneCharacterAnimator : MonoBehaviour
     public float runAnimSpeed = 9f;      // same for the run clip
     public float runThreshold = 7.5f;    // faster than this = run
     public float fadeTime = 0.18f;
+    [Tooltip("Nudges the model up (+) or down (-) in metres if its feet don't quite touch the ground.")]
+    public float footOffset = 0f;
 
     string current = "";
     float airTime;
@@ -18,6 +20,7 @@ public class ThorvayneCharacterAnimator : MonoBehaviour
     {
         if (player == null) player = GetComponentInParent<ThorvaynePlayer>();
         if (animator == null) animator = GetComponentInChildren<Animator>();
+        if (animator != null && footOffset != 0f) animator.transform.localPosition += Vector3.up * footOffset;
     }
 
     void Update()
