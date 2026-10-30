@@ -208,9 +208,10 @@ namespace Thorvayne.WorldGen.EditorTools
             for (int i = 0; i < trees.Count; i++)
             {
                 var t = trees[i];
+                float nx = (t.x - ox) / tileSize, nz = (t.z - oz) / tileSize;
                 inst[i] = new TreeInstance
                 {
-                    position = new Vector3((t.x - ox) / tileSize, 0, (t.z - oz) / tileSize),
+                    position = new Vector3(nx, GroundedTreeHeight(td, nx, nz, t), nz),
                     prototypeIndex = (int)t.kind,
                     widthScale = t.scale,
                     heightScale = t.scale * (0.9f + 0.2f * Mathf.Repeat(t.rotation * 7.3f, 1f)),
@@ -219,7 +220,7 @@ namespace Thorvayne.WorldGen.EditorTools
                     lightmapColor = Color.white,
                 };
             }
-            td.SetTreeInstances(inst, true);
+            td.SetTreeInstances(inst, false);   // heights come from GroundedTreeHeight
             ReplaceAsset(td, $"{GenDir}/Terrain_{tx}_{tz}.asset");
 
             var go = Terrain.CreateTerrainGameObject(td);
@@ -493,6 +494,21 @@ namespace Thorvayne.WorldGen.EditorTools
                 list.places.Add(new PlaceEntry { name = c.name, type = "cave", x = c.x, y = c.y, z = c.z, yaw = c.yaw, dangerTier = c.dangerTier, biome = c.biome.ToString() });
             File.WriteAllText($"{GenDir}/Places_seed{r.settings.seed}.json", JsonUtility.ToJson(list, true));
             AssetDatabase.Refresh();
+        }
+
+        // A tree's base is flat but the ground under it may slope: standing at the height of its centre, the downhill side
+        // of the trunk and roots floats. Sink each tree by how much the ground drops across its base (wider for the
+        // broadleaf model, whose roots spread about a metre each way), so every side meets the ground.
+        static readonly float[] TreeBaseRadius = { 1.1f, 0.45f, 0.45f, 0.35f, 0.5f, 0.6f };   // TreeKind order
+
+        static float GroundedTreeHeight(TerrainData td, float nx, float nz, TreePlacement t)
+        {
+            float ground = td.GetInterpolatedHeight(nx, nz);
+            float slope = Mathf.Min(td.GetSteepness(nx, nz), 50f) * Mathf.Deg2Rad;
+            int k = (int)t.kind;
+            float radius = (k < TreeBaseRadius.Length ? TreeBaseRadius[k] : 0.5f) * t.scale;
+            float sink = 0.05f + Mathf.Min(radius * Mathf.Tan(slope), 1.5f);
+            return Mathf.Max(0f, ground - sink) / td.size.y;
         }
 
         [Serializable] class PlaceEntry { public string name, type, biome; public float x, y, z, yaw; public int dangerTier; public bool isStarter; }
