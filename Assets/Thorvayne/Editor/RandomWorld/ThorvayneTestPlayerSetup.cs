@@ -103,14 +103,23 @@ namespace Thorvayne.WorldGen.EditorTools
             body.transform.localPosition = Vector3.zero;
             body.transform.localRotation = Quaternion.identity;
 
-            // face the player's forward (+Z): the toes point the way the model faces
+            // face the player's forward (+Z): square to the line through the hips, on the side the toes point to.
+            // (Not along one foot: feet turn out ~10 degrees, which made the character run slightly sideways.)
             var bodyAnim = body.GetComponent<Animator>();
             bool human = bodyAnim != null && bodyAnim.isHuman;
             var foot = human ? bodyAnim.GetBoneTransform(HumanBodyBones.LeftFoot) : FindDeep(body.transform, "LeftFoot");
             var toes = human ? bodyAnim.GetBoneTransform(HumanBodyBones.LeftToes) : FindDeep(body.transform, "LeftToes");
+            var legL = human ? bodyAnim.GetBoneTransform(HumanBodyBones.LeftUpperLeg) : FindDeep(body.transform, "LeftUpLeg");
+            var legR = human ? bodyAnim.GetBoneTransform(HumanBodyBones.RightUpperLeg) : FindDeep(body.transform, "RightUpLeg");
             if (foot != null && toes != null)
             {
                 var d = toes.position - foot.position; d.y = 0;
+                if (legL != null && legR != null)
+                {
+                    var right = legR.position - legL.position; right.y = 0;
+                    var f = Vector3.Cross(right, Vector3.up);
+                    if (f.sqrMagnitude > 1e-6f) d = Vector3.Dot(f, d) >= 0 ? f : -f;
+                }
                 if (d.sqrMagnitude > 1e-6f)
                     body.transform.localRotation = Quaternion.FromToRotation(d.normalized, Vector3.forward);
             }
