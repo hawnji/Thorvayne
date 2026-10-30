@@ -5,8 +5,9 @@ using UnityEngine;
 namespace Thorvayne.WorldGen.EditorTools
 {
     // Thorvayne > Check Trees: reports why terrain trees might not show, and fixes what it safely can:
-    // trees switched off on a terrain, a tree distance of 0, and trees left shrunk to nothing by woodcutting
-    // (felled trees are hidden by scaling them to 0 and put back on Stop; a crash or a script reload can skip that).
+    // trees switched off on a terrain, a tree distance of 0, trees left shrunk to nothing by woodcutting
+    // (felled trees are hidden by scaling them to 0 and put back on Stop; a crash or a script reload can skip that),
+    // and tree prefabs that lost their meshes (rebuilt in place).
     public static class ThorvayneTreeCheck
     {
         [MenuItem("Thorvayne/Check Trees")]
@@ -64,6 +65,15 @@ namespace Thorvayne.WorldGen.EditorTools
                 report.Append("\n");
             }
             Debug.Log(report.ToString());
+
+            // trees with no mesh can't be drawn: build the tree prefabs again and hand them to the terrains
+            bool meshless = td0.treePrototypes.Any(tp => tp.prefab != null && tp.prefab.GetComponentsInChildren<MeshFilter>(true).Any(f => f.sharedMesh == null));
+            if (meshless)
+            {
+                bool ok = ThorvayneRandomWorldBuilder.RebuildTreePrefabs(terrains);
+                if (ok) Debug.Log("Check Trees: the tree prefabs had lost their meshes. Rebuilt them; the trees should show now. Save the scene (Ctrl+S).");
+                else Debug.LogError("Check Trees: rebuilt the tree prefabs but they still have no meshes. Please send this message to Claude.");
+            }
             Debug.Log($"Check Trees: {terrains.Length} terrains, {total} trees. Put back {shrunk} shrunk trees, " +
                       $"switched trees back on for {fixedTerrains} terrains. Tree types with a missing prefab: {noPrefab}" +
                       (total == 0 ? ". There are no trees at all: generate the world again (seed 1234)." : "."));

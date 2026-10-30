@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -498,12 +499,33 @@ namespace Thorvayne.WorldGen.EditorTools
         [Serializable] class PlaceList { public int seed; public float worldSize, seaLevel; public List<PlaceEntry> places = new List<PlaceEntry>(); }
 
         // ---------------- trees ----------------
+        // Rebuilds the tree prefabs and points every terrain in the scene at them (Thorvayne > Check Trees uses this
+        // to repair a world without generating it again). Returns false if a prefab still has no mesh.
+        internal static bool RebuildTreePrefabs(Terrain[] terrains)
+        {
+            EnsureFolder(GenDir);
+            matCache.Clear();
+            var protos = BuildTreePrototypes();
+            foreach (var t in terrains)
+            {
+                var td = t.terrainData;
+                if (td == null || td.treePrototypes.Length != protos.Length) continue;
+                var tps = new TreePrototype[protos.Length];
+                for (int i = 0; i < protos.Length; i++) tps[i] = new TreePrototype { prefab = protos[i] };
+                td.treePrototypes = tps;
+                td.RefreshPrototypes();
+                EditorUtility.SetDirty(td);
+            }
+            AssetDatabase.SaveAssets();
+            return protos.All(p => p != null && p.GetComponentsInChildren<MeshFilter>(true).All(f => f.sharedMesh != null));
+        }
+
         static GameObject[] BuildTreePrototypes()
         {
             var bark = Mat("Bark", new Color(0.38f, 0.26f, 0.16f));
             var palmBark = Mat("PalmBark", new Color(0.55f, 0.43f, 0.28f));
             // order must match the TreeKind enum
-            return new[]
+            var protos = new[]
             {
                 ModelTree("Broadleaf", 7f) ?? TreePrefab("Broadleaf", BuildBroadleaf(1f, 1f), bark, Mat("Leaves", new Color(0.26f, 0.5f, 0.2f))),
                 TreePrefab("Conifer", BuildConifer(), bark, Mat("ConiferLeaves", new Color(0.16f, 0.38f, 0.22f))),
@@ -512,6 +534,11 @@ namespace Thorvayne.WorldGen.EditorTools
                 TreePrefab("Shrub", BuildShrub(), bark, Mat("ShrubLeaves", new Color(0.45f, 0.5f, 0.22f))),
                 TreePrefab("SwampTree", BuildBroadleaf(1.3f, 0.7f), Mat("SwampBark", new Color(0.28f, 0.24f, 0.18f)), Mat("SwampLeaves", new Color(0.3f, 0.36f, 0.18f))),
             };
+            AssetDatabase.SaveAssets();
+            foreach (var p in protos)
+                foreach (var f in p.GetComponentsInChildren<MeshFilter>(true))
+                    if (f.sharedMesh == null) Debug.LogError($"Tree prefab {p.name}: {f.name} lost its mesh, so these trees won't show.");
+            return protos;
         }
 
         // ---- tree models ----
@@ -557,8 +584,7 @@ namespace Thorvayne.WorldGen.EditorTools
                 for (int i = 0; i < n.Length; i++) n[i] = m.MultiplyVector(n[i]).normalized;
                 mesh.vertices = v; if (n.Length == v.Length) mesh.normals = n;
                 mesh.RecalculateBounds();
-                ReplaceAsset(mesh, $"{GenDir}/Mesh_Tree{name}_{c.name}.asset");
-                mf.sharedMesh = mesh;
+                mf.sharedMesh = SaveMesh(mesh, $"{GenDir}/Mesh_Tree{name}_{c.name}.asset");
                 c.localPosition = Vector3.zero; c.localRotation = Quaternion.identity; c.localScale = Vector3.one;
             }
 
@@ -608,7 +634,7 @@ namespace Thorvayne.WorldGen.EditorTools
 
         static GameObject TreePrefab(string name, Mesh mesh, Material trunk, Material leaves)
         {
-            ReplaceAsset(mesh, $"{GenDir}/Mesh_{name}.asset");
+            mesh = SaveMesh(mesh, $"{GenDir}/Mesh_{name}.asset");
             var go = new GameObject(name);
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             go.AddComponent<MeshRenderer>().sharedMaterials = new[] { trunk, leaves };
@@ -814,6 +840,24 @@ namespace Thorvayne.WorldGen.EditorTools
         }
 
         // ---------------- asset helpers ----------------
+        // Saves a tree mesh and returns the saved asset. A mesh already saved there is overwritten in place (same file,
+        // same id), so prefabs keep pointing at it. Deleting and re-creating it left every tree prefab with a missing
+        // mesh, so the terrains had all their trees but drew none of them.
+        static Mesh SaveMesh(Mesh mesh, string path)
+        {
+            var existing = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            if (existing == null)
+            {
+                ReplaceAsset(mesh, path);
+                return mesh;
+            }
+            EditorUtility.CopySerialized(mesh, existing);
+            existing.name = Path.GetFileNameWithoutExtension(path);
+            EditorUtility.SetDirty(existing);
+            UnityEngine.Object.DestroyImmediate(mesh);
+            return existing;
+        }
+
         static void ReplaceAsset(UnityEngine.Object obj, string path)
         {
             if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path) != null) AssetDatabase.DeleteAsset(path);
