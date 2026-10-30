@@ -17,6 +17,8 @@ namespace Thorvayne.WorldGen.EditorTools
         const string HeroPath = "Assets/Thorvayne/Characters/ThorvayneHero.fbx";
         const string ControllerPath = "Assets/Thorvayne/Characters/ThorvayneHero.controller";
         const string SkinPath = "Assets/Thorvayne/Characters/ThorvayneHero_Skin.png";   // optional colour texture
+        const string AxeWoodPath = "Assets/Thorvayne/Characters/ThorvayneAxe_Albedo.png";
+        const string AxeMetalPath = "Assets/Thorvayne/Characters/ThorvayneAxe_Metal.png";   // light grey, tinted per axe in game
         static readonly string[] Clips = { "Idle", "Walk", "Run", "Jump", "Swim", "Fly", "Chop" };
         const float HeroHeight = 1.8f;
 
@@ -137,10 +139,7 @@ namespace Thorvayne.WorldGen.EditorTools
                 float skin = player.GetComponent<CharacterController>().skinWidth;
                 body.transform.position += Vector3.up * (player.transform.position.y - b.min.y - skin);
             }
-            var skinTex = AssetDatabase.LoadAssetAtPath<Texture2D>(SkinPath);
-            var mat = PlayerMat("HeroSkin", skinTex != null ? Color.white : new Color(0.78f, 0.66f, 0.55f));
-            foreach (var prop in new[] { "_BaseMap", "_MainTex", "_BaseColorMap" })   // URP, Built-in, HDRP
-                if (mat.HasProperty(prop)) mat.SetTexture(prop, skinTex);
+            var mat = TexturedMat("HeroSkin", SkinPath, new Color(0.78f, 0.66f, 0.55f));
             foreach (var r in rends)
             {
                 var mats = new Material[r.sharedMaterials.Length];
@@ -154,7 +153,12 @@ namespace Thorvayne.WorldGen.EditorTools
             {
                 var ar = axe.GetComponent<Renderer>();
                 if (ar != null)
-                    ar.sharedMaterials = new[] { PlayerMat("AxeWood", new Color(0.45f, 0.3f, 0.15f)), PlayerMat("AxeMetal", new Color(0.62f, 0.63f, 0.66f)) };
+                {
+                    var metal = TexturedMat("AxeMetal", AxeMetalPath, new Color(0.62f, 0.63f, 0.66f));
+                    if (metal.HasProperty("_Metallic")) metal.SetFloat("_Metallic", 0.5f);
+                    if (metal.HasProperty("_Smoothness")) metal.SetFloat("_Smoothness", 0.45f);
+                    ar.sharedMaterials = new[] { TexturedMat("AxeWood", AxeWoodPath, new Color(0.45f, 0.3f, 0.15f)), metal };
+                }
                 axe.gameObject.SetActive(false);   // shown while an axe is equipped or in use
             }
 
@@ -262,6 +266,16 @@ namespace Thorvayne.WorldGen.EditorTools
             cam.nearClipPlane = 0.3f;
             cam.farClipPlane = 4000f;
             return cam;
+        }
+
+        // a material with an optional colour texture (plain colour when the texture isn't there)
+        static Material TexturedMat(string name, string texPath, Color fallback)
+        {
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(texPath);
+            var mat = PlayerMat(name, tex != null ? Color.white : fallback);
+            foreach (var prop in new[] { "_BaseMap", "_MainTex", "_BaseColorMap" })   // URP, Built-in, HDRP
+                if (mat.HasProperty(prop)) mat.SetTexture(prop, tex);
+            return mat;
         }
 
         static Material PlayerMat(string name, Color color)
