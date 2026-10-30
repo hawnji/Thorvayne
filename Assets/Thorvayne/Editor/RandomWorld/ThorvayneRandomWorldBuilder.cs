@@ -566,8 +566,12 @@ namespace Thorvayne.WorldGen.EditorTools
         static GameObject ModelTree(string name, float height)
         {
             string fbx = $"{TreeModelDir}/{name}.fbx";
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(fbx) == null) return null;
+            // read the model and its pictures fresh from disk: a model from one run of make_tree.py with the texture
+            // from another (each run lays the texture out differently) paints the tree in scrambled patches
+            foreach (var f in new[] { fbx, $"{TreeModelDir}/{name}_Albedo.png", $"{TreeModelDir}/{name}_Impostor.png" })
+                if (File.Exists(f)) AssetDatabase.ImportAsset(f, ImportAssetOptions.ForceUpdate);
             var model = AssetDatabase.LoadAssetAtPath<GameObject>(fbx);
-            if (model == null) return null;
             var importer = AssetImporter.GetAtPath(fbx) as ModelImporter;
             if (importer != null && (importer.materialImportMode != ModelImporterMaterialImportMode.None || importer.importAnimation))
             {
@@ -867,7 +871,17 @@ namespace Thorvayne.WorldGen.EditorTools
                 ReplaceAsset(mesh, path);
                 return mesh;
             }
-            EditorUtility.CopySerialized(mesh, existing);
+            // copy the mesh data over explicitly (vertices, normals, UVs, triangles), so nothing from the old mesh stays behind
+            existing.Clear();
+            existing.indexFormat = mesh.indexFormat;
+            existing.vertices = mesh.vertices;
+            existing.normals = mesh.normals;
+            existing.tangents = mesh.tangents;
+            existing.uv = mesh.uv;
+            existing.colors = mesh.colors;
+            existing.subMeshCount = mesh.subMeshCount;
+            for (int i = 0; i < mesh.subMeshCount; i++) existing.SetTriangles(mesh.GetTriangles(i), i);
+            existing.RecalculateBounds();
             existing.name = Path.GetFileNameWithoutExtension(path);
             EditorUtility.SetDirty(existing);
             UnityEngine.Object.DestroyImmediate(mesh);
