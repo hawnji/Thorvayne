@@ -34,6 +34,19 @@ bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
 bpy.ops.mesh.remove_doubles(threshold=1e-5)
 bpy.ops.object.mode_set(mode='OBJECT')
 
+# stand it up straight: generated models often come slightly tipped. Walls are vertical, so "up" is the direction
+# most at right angles to the walls' faces: the smallest singular vector of the (area-weighted) near-horizontal normals.
+me0 = house.data
+nrm = np.zeros(len(me0.polygons) * 3); me0.polygons.foreach_get('normal', nrm); nrm = nrm.reshape(-1, 3)
+area = np.zeros(len(me0.polygons)); me0.polygons.foreach_get('area', area)
+wall = np.abs(nrm[:, 2]) < 0.35
+up = np.linalg.svd(nrm[wall] * np.sqrt(area[wall])[:, None], full_matrices=False)[2][2]
+if up[2] < 0: up = -up
+tilt = Vector(up[:]).rotation_difference(Vector((0, 0, 1))).to_matrix()
+for v in me0.vertices: v.co = tilt @ v.co
+me0.update()
+print('tipped', round(float(np.degrees(np.arccos(min(1.0, up[2])))), 2), 'degrees, stood up straight')
+
 # square it up: turn it so the walls (the lowest quarter, below the roof) fill the smallest axis-aligned box
 P = np.array([v.co[:] for v in house.data.vertices])
 zmin, zmax = P[:, 2].min(), P[:, 2].max()

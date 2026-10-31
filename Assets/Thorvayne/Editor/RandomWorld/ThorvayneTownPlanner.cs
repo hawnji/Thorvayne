@@ -225,7 +225,7 @@ namespace Thorvayne.WorldGen
                 float h = r.HeightAt(x, z);
                 lo = Math.Min(lo, h); hi = Math.Max(hi, h); sum += h;
             }
-            if (hi - lo > 1.6f) return false;
+            if (hi - lo > 1.0f) return false;     // more and the uphill side buries the wall above the stone base
             placed.Add(box);
             // floor at the average height, but never so high that the buried part of the stone base shows
             float y = Math.Min(sum / 9f, lo + 0.6f);
