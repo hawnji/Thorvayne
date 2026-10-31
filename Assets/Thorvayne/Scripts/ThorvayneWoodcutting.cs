@@ -34,6 +34,10 @@ public class ThorvayneWoodcutting : MonoBehaviour
     public float reach = 3.2f;            // how close (m) you must stand to a tree
     public float swingTime = 1.8f;        // one swing; matches the Chop animation
     [Range(0, 1)] public float strikeTime = 0.68f;   // when in the swing the axe hits
+    public float chopDistance = 1.15f;    // where you stand from the tree's middle, so the swing meets the trunk
+    [Tooltip("Hit sounds; left empty, the WoodThud sounds in Resources/Audio are used.")]
+    public AudioClip[] hitSounds;
+    [Range(0, 1)] public float hitVolume = 0.8f;
     [Tooltip("Multiplies Woodcutting XP. Raise it (e.g. 20) to reach the higher trees quickly while testing.")]
     public float xpMultiplier = 1f;
 
@@ -57,6 +61,15 @@ public class ThorvayneWoodcutting : MonoBehaviour
     Animator axeAnimator;
     int gripLayer = -1;
     ThorvayneItems.Item choppingAxe;
+    CharacterController controller;
+    // while chopping, the terrain tree is swapped for a copy of it that can shake when hit
+    GameObject standIn;
+    Target standInFor;
+    Quaternion standInRotation;
+    Vector3 shakeAxis;
+    float shakeClock = -1;
+    ParticleSystem chips;
+    AudioSource hitAudio;
 
     void Start()
     {
@@ -84,6 +97,8 @@ public class ThorvayneWoodcutting : MonoBehaviour
         }
         FindAxe();
         UpdateAxe();
+        controller = GetComponent<CharacterController>();
+        MakeHitEffects();
     }
 
     void OnDestroy() { if (equipment != null) equipment.Changed -= UpdateAxe; }
@@ -97,6 +112,7 @@ public class ThorvayneWoodcutting : MonoBehaviour
             for (int i = 0; i < tt.hidden.Length; i++)
                 if (tt.hidden[i]) { tt.terrain.terrainData.SetTreeInstance(i, tt.original[i]); tt.hidden[i] = false; }
         }
+        RemoveStandIn();
         chopping = null;
     }
 
@@ -125,11 +141,17 @@ public class ThorvayneWoodcutting : MonoBehaviour
                 var d = chopping.pos - transform.position; d.y = 0;
                 if (d.sqrMagnitude > 0.01f)
                     transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(d), Time.deltaTime * 10f);
+                // step in or back to swinging distance, so the axe meets the trunk
+                float off = d.magnitude - chopDistance;
+                if (controller != null && Mathf.Abs(off) > 0.05f && d.sqrMagnitude > 0.01f)
+                    controller.Move(d.normalized * Mathf.Clamp(off, -1f, 1f) * Mathf.Min(1f, Time.deltaTime * 5f));
                 swingClock += Time.deltaTime;
                 if (!struck && swingClock >= strikeTime * swingTime) { struck = true; Strike(); }
                 if (swingClock >= swingTime) { swingClock -= swingTime; struck = false; }
             }
         }
+
+        Shake();
 
         if (chopping != null) Prompt = $"Chopping {chopping.type.displayName.ToLower()}...  (E or move to stop)";
         else if (near != null)
@@ -157,12 +179,14 @@ public class ThorvayneWoodcutting : MonoBehaviour
         if (!inventory.CanAdd(t.type.logId)) { Say("Your inventory is too full to hold any more logs."); return; }
         chopping = t; choppingAxe = best;
         swingClock = 0; struck = false;
+        MakeStandIn(t);
         UpdateAxe();
         Say("You swing your axe at the tree.");
     }
 
     void Stop()
     {
+        RemoveStandIn();
         chopping = null; choppingAxe = null;
         UpdateAxe();
     }
@@ -170,6 +194,7 @@ public class ThorvayneWoodcutting : MonoBehaviour
     void Strike()
     {
         var t = chopping;
+        HitEffects(t);
         int level = skills.Level("Woodcutting");
         // 35% per swing at the tree's level with a bronze axe, rising with your level and a better axe
         int power = choppingAxe != null ? choppingAxe.power : 1;
@@ -217,6 +242,7 @@ public class ThorvayneWoodcutting : MonoBehaviour
     // ---------------- felling and regrowing ----------------
     void Fell(Target t)
     {
+        if (standIn != null) { Destroy(standIn); standIn = null; standInFor = null; }   // the falling copy takes over
         var inst = t.tt.original[t.index];
         var hiddenInst = inst; hiddenInst.widthScale = 0; hiddenInst.heightScale = 0;
         t.tt.terrain.terrainData.SetTreeInstance(t.index, hiddenInst);
@@ -279,6 +305,99 @@ public class ThorvayneWoodcutting : MonoBehaviour
             stump.GetComponent<Renderer>().sharedMaterial = mat;
         }
         return stump;
+    }
+
+    // ---------------- hits: wood chips, a thud and the tree shaking ----------------
+    void MakeHitEffects()
+    {
+        var go = new GameObject("WoodChips");
+        chips = go.AddComponent<ParticleSystem>();
+        chips.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        var main = chips.main;
+        main.playOnAwake = false; main.loop = false; main.maxParticles = 300;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(0.8f, 1.4f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(2f, 4.5f);
+        main.gravityModifier = 1.6f;
+        main.startSize3D = true;                                              // thin flat chips
+        main.startSizeX = new ParticleSystem.MinMaxCurve(0.04f, 0.09f);
+        main.startSizeY = new ParticleSystem.MinMaxCurve(0.01f, 0.02f);
+        main.startSizeZ = new ParticleSystem.MinMaxCurve(0.03f, 0.06f);
+        main.startRotation3D = true;
+        main.startRotationX = main.startRotationY = main.startRotationZ = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+        main.startColor = new ParticleSystem.MinMaxGradient(new Color(0.85f, 0.7f, 0.48f), new Color(0.55f, 0.4f, 0.24f));
+        var emission = chips.emission; emission.enabled = false;                // sent out in bursts by HitEffects
+        var shape = chips.shape; shape.shapeType = ParticleSystemShapeType.Cone; shape.angle = 35f; shape.radius = 0.05f;
+        var spin = chips.rotationOverLifetime; spin.enabled = true; spin.separateAxes = true;
+        spin.x = spin.y = spin.z = new ParticleSystem.MinMaxCurve(-12f, 12f);
+        var hit = chips.collision; hit.enabled = true; hit.type = ParticleSystemCollisionType.World;
+        hit.bounce = 0.2f; hit.dampen = 0.6f; hit.lifetimeLoss = 0f;
+        var r = go.GetComponent<ParticleSystemRenderer>();
+        var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        r.renderMode = ParticleSystemRenderMode.Mesh; r.mesh = cube.GetComponent<MeshFilter>().sharedMesh;
+        Destroy(cube);
+        var shader = Shader.Find(UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline != null
+                                 ? "Universal Render Pipeline/Particles/Lit" : "Particles/Standard Surface");
+        r.material = new Material(shader != null ? shader : Shader.Find("Sprites/Default"));
+
+        if (hitSounds == null || hitSounds.Length == 0)
+            hitSounds = Array.FindAll(Resources.LoadAll<AudioClip>("Audio"), c => c.name.StartsWith("WoodThud"));
+        hitAudio = new GameObject("ChopSound").AddComponent<AudioSource>();
+        hitAudio.playOnAwake = false; hitAudio.spatialBlend = 1f;
+        hitAudio.rolloffMode = AudioRolloffMode.Linear; hitAudio.minDistance = 3f; hitAudio.maxDistance = 45f;
+    }
+
+    void HitEffects(Target t)
+    {
+        var toMe = transform.position - t.pos; toMe.y = 0;
+        toMe = toMe.sqrMagnitude > 0.01f ? toMe.normalized : -transform.forward;
+        var point = t.pos + Vector3.up * 1.1f + toMe * 0.3f;          // where the blade bites the trunk
+        if (chips != null)
+        {
+            chips.transform.SetPositionAndRotation(point, Quaternion.LookRotation(toMe + Vector3.up * 0.6f));
+            chips.Emit(UnityEngine.Random.Range(10, 17));
+        }
+        if (hitAudio != null && hitSounds != null && hitSounds.Length > 0)
+        {
+            hitAudio.transform.position = point;
+            hitAudio.pitch = UnityEngine.Random.Range(0.92f, 1.08f);
+            hitAudio.PlayOneShot(hitSounds[UnityEngine.Random.Range(0, hitSounds.Length)], hitVolume);
+        }
+        if (standIn != null) { shakeAxis = Vector3.Cross(Vector3.up, -toMe); shakeClock = 0; }   // tips away from you
+    }
+
+    // A quick wobble that dies away, pivoting at the base.
+    void Shake()
+    {
+        if (shakeClock < 0 || standIn == null) return;
+        shakeClock += Time.deltaTime;
+        float angle = 1.8f * Mathf.Sin(shakeClock * 32f) * Mathf.Exp(-shakeClock * 6f);
+        standIn.transform.rotation = Quaternion.AngleAxis(angle, shakeAxis) * standInRotation;
+        if (shakeClock > 0.8f) { standIn.transform.rotation = standInRotation; shakeClock = -1; }
+    }
+
+    // Terrain trees can't move on their own, so the one being chopped is hidden and a copy stands in for it.
+    void MakeStandIn(Target t)
+    {
+        RemoveStandIn();
+        var inst = t.tt.original[t.index];
+        var prefab = t.tt.terrain.terrainData.treePrototypes[inst.prototypeIndex].prefab;
+        if (prefab == null) return;
+        standInRotation = Quaternion.Euler(0, inst.rotation * Mathf.Rad2Deg, 0);
+        standIn = Instantiate(prefab, t.pos, standInRotation); standInFor = t;
+        standIn.transform.localScale = new Vector3(inst.widthScale, inst.heightScale, inst.widthScale);
+        var hidden = inst; hidden.widthScale = 0; hidden.heightScale = 0;
+        t.tt.terrain.terrainData.SetTreeInstance(t.index, hidden);
+        shakeClock = -1;
+    }
+
+    void RemoveStandIn()
+    {
+        if (standIn == null) return;
+        Destroy(standIn); standIn = null;
+        var t = standInFor; standInFor = null;
+        if (t != null && !t.tt.hidden[t.index] && t.tt.terrain != null)   // not felled: put the terrain tree back
+            t.tt.terrain.terrainData.SetTreeInstance(t.index, t.tt.original[t.index]);
     }
 
     // ---------------- the axe ----------------
