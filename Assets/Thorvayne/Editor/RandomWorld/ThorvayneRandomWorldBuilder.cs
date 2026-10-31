@@ -570,8 +570,9 @@ namespace Thorvayne.WorldGen.EditorTools
             var protos = new[]
             {
                 ModelTree("Broadleaf", 7f) ?? TreePrefab("Broadleaf", BuildBroadleaf(1f, 1f), bark, Mat("Leaves", new Color(0.26f, 0.5f, 0.2f))),
-                TreePrefab("Conifer", BuildConifer(), bark, Mat("ConiferLeaves", new Color(0.16f, 0.38f, 0.22f))),
-                TreePrefab("SnowPine", BuildConifer(), bark, Mat("SnowPineLeaves", new Color(0.72f, 0.82f, 0.82f))),
+                ModelTree("Conifer", 9f) ?? TreePrefab("Conifer", BuildConifer(), bark, Mat("ConiferLeaves", new Color(0.16f, 0.38f, 0.22f))),
+                // frost pines: the pine model, frosted pale blue-white
+                ModelTree("SnowPine", 9f, "Conifer", new Color(0.82f, 0.92f, 0.98f)) ?? TreePrefab("SnowPine", BuildConifer(), bark, Mat("SnowPineLeaves", new Color(0.72f, 0.82f, 0.82f))),
                 TreePrefab("Palm", BuildPalm(), palmBark, Mat("PalmLeaves", new Color(0.35f, 0.58f, 0.2f))),
                 TreePrefab("Shrub", BuildShrub(), bark, Mat("ShrubLeaves", new Color(0.45f, 0.5f, 0.22f))),
                 TreePrefab("SwampTree", BuildBroadleaf(1.3f, 0.7f), Mat("SwampBark", new Color(0.28f, 0.24f, 0.18f)), Mat("SwampLeaves", new Color(0.3f, 0.36f, 0.18f))),
@@ -587,27 +588,29 @@ namespace Thorvayne.WorldGen.EditorTools
         // A real tree model replaces a placeholder when Assets/Thorvayne/Trees/<name>.fbx exists, with child objects
         // LOD0 (the tree, textured with <name>_Albedo.png) and LOD1 (crossed cards using <name>_Impostor.png).
         // Extras/make_tree.py makes these from a high-poly .glb. Returns null when there is no model.
+        // model: another tree's files to use (e.g. frost pines use the pine), tint: a colour multiplied over its texture.
         const string TreeModelDir = "Assets/Thorvayne/Trees";
 
-        static GameObject ModelTree(string name, float height)
+        static GameObject ModelTree(string name, float height, string model = null, Color? tint = null)
         {
-            string fbx = $"{TreeModelDir}/{name}.fbx";
+            model = model ?? name;
+            string fbx = $"{TreeModelDir}/{model}.fbx";
             if (AssetDatabase.LoadAssetAtPath<GameObject>(fbx) == null) return null;
             // read the model and its pictures fresh from disk: a model from one run of make_tree.py with the texture
             // from another (each run lays the texture out differently) paints the tree in scrambled patches
-            foreach (var f in new[] { fbx, $"{TreeModelDir}/{name}_Albedo.png", $"{TreeModelDir}/{name}_Impostor.png" })
+            foreach (var f in new[] { fbx, $"{TreeModelDir}/{model}_Albedo.png", $"{TreeModelDir}/{model}_Impostor.png" })
                 if (File.Exists(f)) AssetDatabase.ImportAsset(f, ImportAssetOptions.ForceUpdate);
-            var model = AssetDatabase.LoadAssetAtPath<GameObject>(fbx);
+            var src = AssetDatabase.LoadAssetAtPath<GameObject>(fbx);
             var importer = AssetImporter.GetAtPath(fbx) as ModelImporter;
             if (importer != null && (importer.materialImportMode != ModelImporterMaterialImportMode.None || importer.importAnimation))
             {
                 importer.materialImportMode = ModelImporterMaterialImportMode.None;
                 importer.importAnimation = false;
                 importer.SaveAndReimport();
-                model = AssetDatabase.LoadAssetAtPath<GameObject>(fbx);
+                src = AssetDatabase.LoadAssetAtPath<GameObject>(fbx);
             }
 
-            var go = UnityEngine.Object.Instantiate(model);
+            var go = UnityEngine.Object.Instantiate(src);
             go.name = name;
             go.transform.position = Vector3.zero; go.transform.rotation = Quaternion.identity;
             var lod0 = go.transform.Find("LOD0"); var lod1 = go.transform.Find("LOD1");
@@ -620,14 +623,14 @@ namespace Thorvayne.WorldGen.EditorTools
             // (felled and regrown) came back lying on their side.
             BakeParts(go, k, $"Tree{name}");
 
-            var albedo = AssetDatabase.LoadAssetAtPath<Texture2D>($"{TreeModelDir}/{name}_Albedo.png");
-            var far = AssetDatabase.LoadAssetAtPath<Texture2D>($"{TreeModelDir}/{name}_Impostor.png");
-            r0.sharedMaterials = new[] { TreeMat($"Tree{name}", albedo, false) };
+            var albedo = AssetDatabase.LoadAssetAtPath<Texture2D>($"{TreeModelDir}/{model}_Albedo.png");
+            var far = AssetDatabase.LoadAssetAtPath<Texture2D>($"{TreeModelDir}/{model}_Impostor.png");
+            r0.sharedMaterials = new[] { TreeMat($"Tree{name}", albedo, false, tint) };
             var lods = new List<LOD> { new LOD(lod1 != null ? 0.12f : 0.01f, new Renderer[] { r0 }) };
             var r1 = lod1 != null ? lod1.GetComponent<MeshRenderer>() : null;
             if (r1 != null)
             {
-                r1.sharedMaterials = new[] { TreeMat($"Tree{name}Far", far, true) };
+                r1.sharedMaterials = new[] { TreeMat($"Tree{name}Far", far, true, tint) };
                 r1.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 lods.Add(new LOD(0.01f, new Renderer[] { r1 }));
             }
@@ -712,9 +715,9 @@ namespace Thorvayne.WorldGen.EditorTools
         }
 
         // Textured, double-sided material for tree models; cutout = see-through where the picture is transparent.
-        static Material TreeMat(string name, Texture2D tex, bool cutout)
+        static Material TreeMat(string name, Texture2D tex, bool cutout, Color? tint = null)
         {
-            var mat = Mat(name, Color.white, 0.02f);
+            var mat = Mat(name, tint ?? Color.white, 0.02f);
             foreach (var prop in new[] { "_BaseMap", "_MainTex", "_BaseColorMap" })
                 if (mat.HasProperty(prop)) mat.SetTexture(prop, tex);
             if (mat.HasProperty("_Cull")) mat.SetFloat("_Cull", 0);                       // URP: render both sides
