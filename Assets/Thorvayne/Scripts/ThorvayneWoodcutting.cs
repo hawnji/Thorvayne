@@ -34,7 +34,7 @@ public class ThorvayneWoodcutting : MonoBehaviour
     public float reach = 3.2f;            // how close (m) you must stand to a tree
     public float swingTime = 1.8f;        // one swing; matches the Chop animation
     [Range(0, 1)] public float strikeTime = 0.68f;   // when in the swing the axe hits
-    public float chopDistance = 1.15f;    // where you stand from the tree's middle, so the swing meets the trunk
+    public float chopDistance = 1.2f;     // where you stand from the tree's middle, so the swing meets the trunk
     [Tooltip("Hit sounds; left empty, the WoodThud sounds in Resources/Audio are used.")]
     public AudioClip[] hitSounds;
     [Range(0, 1)] public float hitVolume = 0.8f;

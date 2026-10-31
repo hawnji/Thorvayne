@@ -1,8 +1,9 @@
 # Adds the Chop (woodcutting) clip to the finished hero and re-exports the FBX.
-# A two-handed side swing: the axe is drawn back over the right shoulder, swung round level at waist height, and
+# A one-handed side swing: the axe is drawn back over the right shoulder, swung round level at waist height, and
 # stops dead in the trunk at the strike (68% of the swing), holds a moment, then is pulled out for the next swing.
 # The axe's path is written down directly (where the grip is and which way the handle and blade point); the arms
-# follow it with IK (right hand holds the grip, left hand lower on the handle) and are baked into the clip.
+# follows it with IK (the right hand holds the grip) and is baked into the clip; the left arm hangs loose and
+# swings a little against the body's turn.
 # The tree stands TREE_DIST metres in front of the feet (ThorvayneWoodcutting.chopDistance).
 # Usage: python add_chop.py -- ThorvayneHero_source.blend out.blend out.fbx   (bpy module, or blender -b -P)
 import bpy, sys, math
@@ -51,14 +52,14 @@ def smooth(x): x = min(1.0, max(0.0, x)); return x * x * (3 - 2 * x)
 # reach: grip distance from the body's middle (m), height: grip height (m), tilt: handle raised above level (degrees)
 # twist: upper body turned to the left (+) or right (-), degrees
 STRIKE = 0.68
-TREE_DIST = 1.15
+TREE_DIST = 1.2
 KEYS = [  # t, angle, reach, height, tilt, twist
-    (0.00, 35, 0.42, 1.12, 0, -8),
+    (0.00, 35, 0.46, 1.16, 0, -8),
     (0.50, 112, 0.34, 1.45, 45, -42),    # drawn back over the right shoulder
-    (STRIKE, 15, 0.42, 1.10, -5, 2),     # in the trunk
-    (0.71, 18, 0.42, 1.11, -4, 0),       # small bounce back off the wood
-    (0.80, 16, 0.42, 1.10, -5, 1),       # settles, held a moment
-    (1.00, 35, 0.42, 1.12, 0, -8),       # pulled out, ready again (same as t = 0)
+    (STRIKE, 15, 0.46, 1.15, -5, 2),     # in the trunk
+    (0.71, 18, 0.46, 1.16, -4, 0),       # small bounce back off the wood
+    (0.80, 16, 0.46, 1.15, -5, 1),       # settles, held a moment
+    (1.00, 35, 0.46, 1.16, 0, -8),       # pulled out, ready again (same as t = 0)
 ]
 def swing(t):
     for (t0, *a), (t1, *b) in zip(KEYS, KEYS[1:]):
@@ -70,7 +71,6 @@ def swing(t):
     return KEYS[-1][1:]
 
 HANDLE_TO_HEAD = 0.52   # grip to the middle of the axe head (make_axe.py: 0.75 m axe held 0.13 m from the end)
-LEFT_GRIP = 0.14        # the left hand holds the handle this far below the right
 
 def axe_matrix(angle, reach, height, tilt):
     a, tl = math.radians(angle), math.radians(tilt)
@@ -90,9 +90,15 @@ hand_len = rig.data.bones[P + 'RightHand'].length
 rig.data.pose_position = 'POSE'
 
 # torso and legs: keyed directly
+_a = rig.matrix_world @ rig.data.bones[P + 'LeftArm'].head_local; _b = rig.matrix_world @ rig.data.bones[P + 'LeftForeArm'].head_local
+REST_DROP = math.degrees(math.atan2(_a.z - _b.z, abs(_b.x - _a.x)))   # how far the rest pose's arms already hang
+
 def body(t):
     angle, reach, height, tilt, twist = swing(t)
     sp = {}
+    # left arm: hangs a little out from the side, elbow soft, carried forward a little as the body winds up
+    add(sp, 'LeftUpperArm', Y, 72 - REST_DROP); add(sp, 'LeftUpperArm', X, -6 + twist * 0.3)
+    add(sp, 'LeftLowerArm', Z, -18)
     for bone, share in (('Spine', 0.3), ('Chest', 0.35), ('UpperChest', 0.35)): add(sp, bone, Z, twist * share)
     lean = 8 * smooth((STRIKE - abs(t - STRIKE)) / STRIKE) if t <= 0.9 else 8 * smooth((1 - t) / 0.1) * 0.3
     add(sp, 'Spine', X, lean - 3); add(sp, 'Head', Z, -twist * 0.5); add(sp, 'Head', X, -4)
@@ -115,23 +121,21 @@ for f in range(FRAMES + 1):
 # arms: IK onto the axe's path, then baked
 rig.pose.ik_solver = 'LEGACY'
 targets = {}
-for side in ('Right', 'Left'):
+for side in ('Right',):
     e = bpy.data.objects.new('IK_' + side, None); sc.collection.objects.link(e); targets[side] = e
     c = pb[P + side + 'Hand'].constraints.new('IK')
-    c.target = e; c.chain_count = 3; c.use_rotation = side == 'Right'; c.use_stretch = False
-arm_bones = [P + s + n for s in ('Right', 'Left') for n in ('Arm', 'ForeArm', 'Hand')]
+    c.target = e; c.chain_count = 3; c.use_rotation = True; c.use_stretch = False
+arm_bones = [P + 'Right' + n for n in ('Arm', 'ForeArm', 'Hand')]
 baked = []
 for f in range(FRAMES + 1):
     sc.frame_set(f + 1)
     am = axe_matrix(*swing(f / FRAMES)[:4])
     hand = am @ axe_in_hand.inverted()                       # where the right hand bone must be to hold the axe there
     targets['Right'].matrix_world = hand @ Matrix.Translation((0, hand_len, 0))   # IK aims the bone's tip
-    left = am @ Vector((0, -LEFT_GRIP, 0))
-    targets['Left'].matrix_world = Matrix.Translation(left + (am.to_3x3() @ Vector((0, 0, -0.02))))
     bpy.context.view_layer.update()
     baked.append({n: rig.convert_space(pose_bone=pb[n], matrix=pb[n].matrix, from_space='POSE', to_space='LOCAL').to_quaternion()
                   for n in arm_bones})
-for side in ('Right', 'Left'):
+for side in ('Right',):
     b = pb[P + side + 'Hand']; b.constraints.remove(b.constraints[-1]); bpy.data.objects.remove(targets[side])
 for f, qs in enumerate(baked):
     for n, q in qs.items():
