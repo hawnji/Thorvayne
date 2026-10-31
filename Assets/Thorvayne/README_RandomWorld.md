@@ -67,6 +67,10 @@ Shrubs can't be chopped. XP and levels work like RuneScape (level 2 at 83 XP, 99
   your ComfyUI axe, cut down to 3k triangles by `Extras/make_axe.py` and put in the hand by `Extras/add_axe.py`
   (textures `Characters/ThorvayneAxe_Albedo.png` and `ThorvayneAxe_Metal.png`). While the axe is in hand, the right hand
   closes around it (a "Grip" layer in the animator that only moves the right fingers; clip from `Extras/add_grip.py`).
+- Chopping is a two-handed side swing (`Extras/add_chop.py`): the axe is drawn back over the right shoulder, swung
+  round at waist height and stops in the trunk. You step to the right distance from the tree on your own. Each hit
+  throws wood chips, gives a wooden thud (`Resources/Audio/WoodThud1-3.wav`, made by `Extras/make_thud.py`; put your
+  own clips in **Hit Sounds** on **Thorvayne Woodcutting** to replace them) and shakes the tree a little.
 - **I** (or **Tab**) opens the 28-slot inventory, **G** the equipment screen, **K** the skills list. Items have icons
   (`Resources/Icons/<item id>.png`, rendered by `Extras/make_icons.py`) and a tooltip on hover; the panels grow on screens
   taller than 1080p (or set **Ui Scale** on **Thorvayne Game UI**). The mouse is
